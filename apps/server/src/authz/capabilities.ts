@@ -186,7 +186,13 @@ export const TENANT_ROLE_CAPABILITIES: Readonly<Record<TenantRole, readonly Capa
     'audit.read',
   ],
   READ_ONLY_ANALYST: [...READ_BASE, 'asset.read', 'integration.read'],
-  SERVICE: ['tenant.read', 'asset.read', 'integration.read', 'integration.health_check', 'job.read'],
+  SERVICE: [
+    'tenant.read',
+    'asset.read',
+    'integration.read',
+    'integration.health_check',
+    'job.read',
+  ],
   AI_WORKER: ['tenant.read', 'asset.read', 'integration.read'],
   RECOVERY_AUTHORITY: ['tenant.read', 'recovery.execute'],
 };

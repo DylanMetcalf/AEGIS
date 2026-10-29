@@ -32,7 +32,7 @@ function withDb(url: string, db: string, user?: string, password?: string): stri
 
 export default async function setup(project: TestProject): Promise<void> {
   const adminUrl =
-    process.env.TEST_DATABASE_ADMIN_URL ?? 'postgres://postgres:postgres@127.0.0.1:5432/postgres';
+    process.env.TEST_DATABASE_ADMIN_URL ?? 'postgres://postgres:postgres@127.0.0.1:5432/postgres'; // secret-scan:allow matches the CI service container default
   const ownerPassword = randomBytes(24).toString('base64url');
   const appPassword = randomBytes(24).toString('base64url');
 
@@ -42,7 +42,9 @@ export default async function setup(project: TestProject): Promise<void> {
     const exists = async (role: string) =>
       (await admin.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role])).rowCount === 1;
     if (!(await exists('aegis_app'))) {
-      await admin.query('CREATE ROLE aegis_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS');
+      await admin.query(
+        'CREATE ROLE aegis_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS',
+      );
     }
     await admin.query(`DROP DATABASE IF EXISTS ${DB_NAME} WITH (FORCE)`);
     for (const [role, pw, extra] of [

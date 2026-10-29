@@ -84,18 +84,18 @@ describe('request schemas', () => {
     expect(createAssetRequestSchema.safeParse({ ...validAsset, tenantId: 'x' }).success).toBe(
       false,
     );
-    expect(createAssetRequestSchema.safeParse({ ...validAsset, assetType: 'SPACESHIP' }).success).toBe(
-      false,
-    );
+    expect(
+      createAssetRequestSchema.safeParse({ ...validAsset, assetType: 'SPACESHIP' }).success,
+    ).toBe(false);
   });
 
   it('rejects control characters and oversized names', () => {
     expect(createAssetRequestSchema.safeParse({ ...validAsset, name: 'a\u0000b' }).success).toBe(
       false,
     );
-    expect(createAssetRequestSchema.safeParse({ ...validAsset, name: 'x'.repeat(201) }).success).toBe(
-      false,
-    );
+    expect(
+      createAssetRequestSchema.safeParse({ ...validAsset, name: 'x'.repeat(201) }).success,
+    ).toBe(false);
   });
 
   it('restricts credential references to the AEGIS_SECRET_ namespace', () => {
@@ -104,10 +104,15 @@ describe('request schemas', () => {
       createIntegrationRequestSchema.safeParse({ ...base, credentialRef: 'env:AEGIS_SECRET_TOKEN' })
         .success,
     ).toBe(true);
-    for (const bad of ['env:DATABASE_URL', 'env:SESSION_SECRET', 'file:/etc/passwd', 'AEGIS_SECRET_X']) {
-      expect(createIntegrationRequestSchema.safeParse({ ...base, credentialRef: bad }).success).toBe(
-        false,
-      );
+    for (const bad of [
+      'env:DATABASE_URL',
+      'env:SESSION_SECRET',
+      'file:/etc/passwd',
+      'AEGIS_SECRET_X',
+    ]) {
+      expect(
+        createIntegrationRequestSchema.safeParse({ ...base, credentialRef: bad }).success,
+      ).toBe(false);
     }
   });
 });

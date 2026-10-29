@@ -19,9 +19,17 @@ export const BUDGET_CEILINGS = {
 export const resourceBudgetSchema = z
   .object({
     objective: z.string().min(1).max(500),
-    scope: z.object({ tenantId: z.string().uuid(), assetIds: z.array(z.string().uuid()).max(100) }).strict(),
-    allowedOperations: z.array(z.string().regex(/^[a-z][a-z0-9_.]*$/)).min(1).max(50),
-    deniedOperations: z.array(z.string().regex(/^[a-z][a-z0-9_.]*$/)).max(50).default([]),
+    scope: z
+      .object({ tenantId: z.string().uuid(), assetIds: z.array(z.string().uuid()).max(100) })
+      .strict(),
+    allowedOperations: z
+      .array(z.string().regex(/^[a-z][a-z0-9_.]*$/))
+      .min(1)
+      .max(50),
+    deniedOperations: z
+      .array(z.string().regex(/^[a-z][a-z0-9_.]*$/))
+      .max(50)
+      .default([]),
     timeBudgetMs: z.number().int().min(100).max(BUDGET_CEILINGS.timeBudgetMs),
     maxOperations: z.number().int().min(1).max(BUDGET_CEILINGS.maxOperations),
     maxRetries: z.number().int().min(0).max(BUDGET_CEILINGS.maxRetries),

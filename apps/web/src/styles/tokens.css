@@ -1,0 +1,106 @@
+/*
+ * AEGIS design tokens.
+ * Dark navy foundation, restrained cyan/blue, violet as secondary accent.
+ * Status colours are always paired with an icon and text, never used alone.
+ * Contrast: text on --surface ≥ 7:1, muted text ≥ 4.5:1, status text ≥ 4.5:1.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --color-bg: #060a13;
+  --color-surface: #0c1322;
+  --color-surface-raised: #111a2d;
+  --color-surface-sunken: #080d18;
+  --color-border: #1d2940;
+  --color-border-strong: #2c3b59;
+
+  /* Text */
+  --color-text: #e7edf6;
+  --color-text-muted: #9aa8bf;
+  --color-text-subtle: #7887a1;
+  --color-text-inverse: #04101a;
+
+  /* Accents */
+  --color-accent: #4cc3e6;
+  --color-accent-strong: #7fd6f0;
+  --color-accent-blue: #5b8cf5;
+  --color-accent-violet: #9d8cf8;
+  --color-accent-soft: rgb(76 195 230 / 0.12);
+  --color-violet-soft: rgb(157 140 248 / 0.14);
+
+  /* Status */
+  --color-ok: #44d39b;
+  --color-ok-soft: rgb(68 211 155 / 0.12);
+  --color-warn: #f2b84b;
+  --color-warn-soft: rgb(242 184 75 / 0.12);
+  --color-crit: #f47272;
+  --color-crit-soft: rgb(244 114 114 / 0.13);
+  --color-neutral: #98a6bd;
+  --color-neutral-soft: rgb(152 166 189 / 0.12);
+  --color-foundation: #b3a6ff;
+  --color-foundation-soft: rgb(157 140 248 / 0.13);
+
+  --color-focus: #8fdcf5;
+
+  /* Typography */
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.55;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --tracking-caps: 0.08em;
+
+  /* Spacing (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --border-width: 1px;
+  --shadow-raised: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-overlay: 0 24px 64px rgb(0 0 0 / 0.6);
+
+  /* Layout */
+  --sidebar-width: 15.5rem;
+  --header-height: 3.5rem;
+  --content-max: 76rem;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

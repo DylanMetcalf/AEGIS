@@ -38,7 +38,11 @@ async function drainJobs() {
   }
 }
 
-async function createTestIntegration(client: HttpClient, scenario: string, extra: Record<string, unknown> = {}) {
+async function createTestIntegration(
+  client: HttpClient,
+  scenario: string,
+  extra: Record<string, unknown> = {},
+) {
   const res = await client.post('/api/integrations', {
     provider: 'aegis.test_adapter',
     name: `sim-${scenario}-${Math.random().toString(36).slice(2, 7)}`,
@@ -58,7 +62,9 @@ describe('integration registry', () => {
     const probe = providers.find((p: { id: string }) => p.id === 'http.endpoint_probe');
     expect(sim.testAdapter).toBe(true);
     expect(probe.testAdapter).toBe(false);
-    expect(sim.capabilities.find((c: { key: string }) => c.key === 'events.collect').implemented).toBe(false);
+    expect(
+      sim.capabilities.find((c: { key: string }) => c.key === 'events.collect').implemented,
+    ).toBe(false);
   });
 
   it('excludes the test adapter when it is disabled', () => {
@@ -88,7 +94,9 @@ describe('integration registry', () => {
       [{ ...base, credentialRef: 'env:AEGIS_SECRET_' }, 400],
     ];
     for (const [body, status] of cases) {
-      expect((await client.post('/api/integrations', body)).statusCode, JSON.stringify(body)).toBe(status);
+      expect((await client.post('/api/integrations', body)).statusCode, JSON.stringify(body)).toBe(
+        status,
+      );
     }
   });
 
@@ -118,7 +126,9 @@ describe('integration registry', () => {
 
   it('never returns credential values, only references', async () => {
     const { client } = await memberClient(ctx, 'INTEGRATION_ADMIN');
-    const i = await createTestIntegration(client, 'healthy', { credentialRef: 'env:AEGIS_SECRET_PROBE_TOKEN' });
+    const i = await createTestIntegration(client, 'healthy', {
+      credentialRef: 'env:AEGIS_SECRET_PROBE_TOKEN',
+    });
     expect(i.credentialRef).toBe('env:AEGIS_SECRET_PROBE_TOKEN');
     expect(i.hasCredential).toBe(true);
     const detail = await client.get(`/api/integrations/${i.id}`);
@@ -135,7 +145,10 @@ describe('integration registry', () => {
       credentialRef: 'env:AEGIS_SECRET_X',
     });
     expect(res.statusCode).toBe(403);
-    expect((await createTestIntegration(client, 'healthy', { credentialRef: 'env:AEGIS_SECRET_X' })).hasCredential).toBe(true);
+    expect(
+      (await createTestIntegration(client, 'healthy', { credentialRef: 'env:AEGIS_SECRET_X' }))
+        .hasCredential,
+    ).toBe(true);
   });
 
   it('prevents attaching an integration to another tenant’s asset', async () => {
@@ -178,7 +191,9 @@ describe('integration health checks (background jobs)', () => {
     expect(detail.integration.status).toBe('CONNECTED');
     expect(detail.integration.effectiveStatus).toBe('CONNECTED');
     expect(detail.healthChecks[0]).toMatchObject({ result: 'CONNECTED', errorCode: null });
-    expect(await auditEvents("action = 'integration.health_checked' AND target_id = $1", [i.id])).toHaveLength(1);
+    expect(
+      await auditEvents("action = 'integration.health_checked' AND target_id = $1", [i.id]),
+    ).toHaveLength(1);
   });
 
   it.each([
@@ -200,7 +215,10 @@ describe('integration health checks (background jobs)', () => {
     const outcome = await runHealthCheck(
       testAdapterProvider as never,
       { scenario: 'timeout', latencyMs: 0 },
-      { network: { allowPrivateNetwork: false, allowInsecureHttp: false }, resolveCredential: () => null },
+      {
+        network: { allowPrivateNetwork: false, allowInsecureHttp: false },
+        resolveCredential: () => null,
+      },
       200,
     );
     expect(outcome).toMatchObject({ result: 'DISCONNECTED', errorCode: 'TIMEOUT' });
@@ -208,11 +226,16 @@ describe('integration health checks (background jobs)', () => {
 
   it('reports a missing credential as an explicit failure', async () => {
     const { client } = await memberClient(ctx, 'INTEGRATION_ADMIN');
-    const i = await createTestIntegration(client, 'healthy', { credentialRef: 'env:AEGIS_SECRET_DOES_NOT_EXIST' });
+    const i = await createTestIntegration(client, 'healthy', {
+      credentialRef: 'env:AEGIS_SECRET_DOES_NOT_EXIST',
+    });
     await client.post(`/api/integrations/${i.id}/health-checks`);
     await drainJobs();
     const detail = (await client.get(`/api/integrations/${i.id}`)).json().integration;
-    expect(detail).toMatchObject({ status: 'DISCONNECTED', lastErrorCode: 'CREDENTIAL_UNAVAILABLE' });
+    expect(detail).toMatchObject({
+      status: 'DISCONNECTED',
+      lastErrorCode: 'CREDENTIAL_UNAVAILABLE',
+    });
   });
 
   it('refuses health checks when the required permission is not granted', async () => {
@@ -225,23 +248,30 @@ describe('integration health checks (background jobs)', () => {
   });
 
   it('does not run declared-but-unimplemented or undeclared capabilities', () => {
-    expect(() => assertCapabilityUsable(testAdapterProvider as never, 'events.collect', ['test.read'])).toThrow(
-      CapabilityError,
-    );
-    expect(() => assertCapabilityUsable(httpProbeProvider as never, 'events.collect', ['http.get'])).toThrow(
-      /CAPABILITY_NOT_DECLARED/,
-    );
+    expect(() =>
+      assertCapabilityUsable(testAdapterProvider as never, 'events.collect', ['test.read']),
+    ).toThrow(CapabilityError);
+    expect(() =>
+      assertCapabilityUsable(httpProbeProvider as never, 'events.collect', ['http.get']),
+    ).toThrow(/CAPABILITY_NOT_DECLARED/);
   });
 
   it('deduplicates requests with the same idempotency key', async () => {
     const { client } = await memberClient(ctx, 'INTEGRATION_ADMIN');
     const i = await createTestIntegration(client, 'healthy');
-    const a = await client.post(`/api/integrations/${i.id}/health-checks`, undefined, { 'idempotency-key': 'abc-1' });
-    const b = await client.post(`/api/integrations/${i.id}/health-checks`, undefined, { 'idempotency-key': 'abc-1' });
+    const a = await client.post(`/api/integrations/${i.id}/health-checks`, undefined, {
+      'idempotency-key': 'abc-1',
+    });
+    const b = await client.post(`/api/integrations/${i.id}/health-checks`, undefined, {
+      'idempotency-key': 'abc-1',
+    });
     expect(a.statusCode).toBe(202);
     expect(b.statusCode).toBe(200);
     expect(b.json().id).toBe(a.json().id);
-    const { rows } = await owner().query("SELECT count(*)::int AS n FROM jobs WHERE payload->>'integrationId' = $1", [i.id]);
+    const { rows } = await owner().query(
+      "SELECT count(*)::int AS n FROM jobs WHERE payload->>'integrationId' = $1",
+      [i.id],
+    );
     expect(rows[0].n).toBe(1);
   });
 
@@ -249,24 +279,35 @@ describe('integration health checks (background jobs)', () => {
     const { client } = await memberClient(ctx, 'INTEGRATION_ADMIN');
     const i = await createTestIntegration(client, 'healthy');
     const job = (await client.post(`/api/integrations/${i.id}/health-checks`)).json();
-    const upd = await client.patch(`/api/integrations/${i.id}`, { version: i.version, config: { scenario: 'degraded' } });
+    const upd = await client.patch(`/api/integrations/${i.id}`, {
+      version: i.version,
+      config: { scenario: 'degraded' },
+    });
     expect(upd.statusCode).toBe(200);
     expect(upd.json()).toMatchObject({ status: 'CONFIGURED', configVersion: 2 });
     await drainJobs();
     const done = (await client.get(`/api/jobs/${job.id}`)).json();
     expect(done).toMatchObject({ status: 'CANCELLED', lastErrorCode: 'SUPERSEDED' });
-    expect((await client.get(`/api/integrations/${i.id}`)).json().integration.status).toBe('CONFIGURED');
+    expect((await client.get(`/api/integrations/${i.id}`)).json().integration.status).toBe(
+      'CONFIGURED',
+    );
   });
 
   it('re-checks authorization when the job runs', async () => {
     const admin = await memberClient(ctx, 'INTEGRATION_ADMIN');
     const i = await createTestIntegration(admin.client, 'healthy');
     const job = (await admin.client.post(`/api/integrations/${i.id}/health-checks`)).json();
-    await owner().query("UPDATE memberships SET status = 'SUSPENDED' WHERE principal_id = $1", [admin.user.id]);
+    await owner().query("UPDATE memberships SET status = 'SUSPENDED' WHERE principal_id = $1", [
+      admin.user.id,
+    ]);
     await drainJobs();
-    const { rows } = await owner().query('SELECT status, last_error_code FROM jobs WHERE id = $1', [job.id]);
+    const { rows } = await owner().query('SELECT status, last_error_code FROM jobs WHERE id = $1', [
+      job.id,
+    ]);
     expect(rows[0]).toEqual({ status: 'FAILED', last_error_code: 'AUTHORIZATION_REVOKED' });
-    const { rows: integ } = await owner().query('SELECT status FROM integrations WHERE id = $1', [i.id]);
+    const { rows: integ } = await owner().query('SELECT status FROM integrations WHERE id = $1', [
+      i.id,
+    ]);
     expect(integ[0].status).toBe('CONFIGURED');
     expect(await auditEvents("action = 'job.denied' AND target_id = $1", [job.id])).toHaveLength(1);
   });
@@ -283,9 +324,14 @@ describe('integration health checks (background jobs)', () => {
       [a.tenantId, a.user.id, JSON.stringify({ integrationId: ib.id, configVersion: 1 })],
     );
     await drainJobs();
-    const { rows: job } = await owner().query('SELECT status, last_error_code FROM jobs WHERE id = $1', [rows[0]!.id]);
+    const { rows: job } = await owner().query(
+      'SELECT status, last_error_code FROM jobs WHERE id = $1',
+      [rows[0]!.id],
+    );
     expect(job[0]).toEqual({ status: 'FAILED', last_error_code: 'INTEGRATION_NOT_FOUND' });
-    expect((await b.client.get(`/api/integrations/${ib.id}`)).json().integration.status).toBe('CONFIGURED');
+    expect((await b.client.get(`/api/integrations/${ib.id}`)).json().integration.status).toBe(
+      'CONFIGURED',
+    );
     expect(ia.status).toBe('CONFIGURED');
   });
 
@@ -299,7 +345,10 @@ describe('integration health checks (background jobs)', () => {
       [a.tenantId, a.user.id],
     );
     await worker.tick();
-    const { rows: job } = await owner().query('SELECT status, last_error_code FROM jobs WHERE id = $1', [rows[0]!.id]);
+    const { rows: job } = await owner().query(
+      'SELECT status, last_error_code FROM jobs WHERE id = $1',
+      [rows[0]!.id],
+    );
     expect(job[0]).toEqual({ status: 'FAILED', last_error_code: 'LEASE_EXPIRED' });
   });
 });
@@ -307,7 +356,9 @@ describe('integration health checks (background jobs)', () => {
 describe('integration lifecycle', () => {
   it('suspends, resumes, and revokes with validated transitions', async () => {
     const { client } = await memberClient(ctx, 'INTEGRATION_ADMIN');
-    const i = await createTestIntegration(client, 'healthy', { credentialRef: 'env:AEGIS_SECRET_PROBE_TOKEN' });
+    const i = await createTestIntegration(client, 'healthy', {
+      credentialRef: 'env:AEGIS_SECRET_PROBE_TOKEN',
+    });
     const s = await client.post(`/api/integrations/${i.id}/suspend`, { version: i.version });
     expect(s.json().status).toBe('SUSPENDED');
     expect((await client.post(`/api/integrations/${i.id}/health-checks`)).statusCode).toBe(409);
@@ -315,19 +366,40 @@ describe('integration lifecycle', () => {
     expect(r.json().status).toBe('CONFIGURED');
     const v = await client.post(`/api/integrations/${i.id}/revoke`, { version: r.json().version });
     expect(v.statusCode).toBe(200);
-    expect(v.json()).toMatchObject({ status: 'REVOKED', hasCredential: false, grantedPermissions: [] });
-    const again = await client.post(`/api/integrations/${i.id}/resume`, { version: v.json().version });
+    expect(v.json()).toMatchObject({
+      status: 'REVOKED',
+      hasCredential: false,
+      grantedPermissions: [],
+    });
+    const again = await client.post(`/api/integrations/${i.id}/resume`, {
+      version: v.json().version,
+    });
     expect(again.statusCode).toBe(409);
     expect(again.json().error.code).toBe('INVALID_STATE_TRANSITION');
-    expect((await client.patch(`/api/integrations/${i.id}`, { version: v.json().version, name: 'zombie' })).statusCode).toBe(409);
+    expect(
+      (
+        await client.patch(`/api/integrations/${i.id}`, {
+          version: v.json().version,
+          name: 'zombie',
+        })
+      ).statusCode,
+    ).toBe(409);
   });
 
   it('reports stale health results as STALE', () => {
     const old = new Date(Date.now() - 2 * 3600_000);
-    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: old }, 3600_000, true)).toBe('STALE');
-    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: new Date() }, 3600_000, true)).toBe('CONNECTED');
-    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: null }, 3600_000, true)).toBe('STALE');
-    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: new Date() }, 3600_000, false)).toBe('UNKNOWN');
+    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: old }, 3600_000, true)).toBe(
+      'STALE',
+    );
+    expect(
+      effectiveStatus({ status: 'CONNECTED', last_health_at: new Date() }, 3600_000, true),
+    ).toBe('CONNECTED');
+    expect(effectiveStatus({ status: 'CONNECTED', last_health_at: null }, 3600_000, true)).toBe(
+      'STALE',
+    );
+    expect(
+      effectiveStatus({ status: 'CONNECTED', last_health_at: new Date() }, 3600_000, false),
+    ).toBe('UNKNOWN');
   });
 });
 
@@ -360,7 +432,8 @@ describe('HTTPS endpoint probe against a real server', () => {
       config,
       {
         network: devNetwork,
-        resolveCredential: () => resolveCredentialRef('env:AEGIS_SECRET_T', { AEGIS_SECRET_T: 'tok-123' }),
+        resolveCredential: () =>
+          resolveCredentialRef('env:AEGIS_SECRET_T', { AEGIS_SECRET_T: 'tok-123' }),
       },
       5000,
     );
@@ -391,7 +464,10 @@ describe('HTTPS endpoint probe against a real server', () => {
     const outcome = await runHealthCheck(
       httpProbeProvider as never,
       { url: `${base}/health` },
-      { network: { allowPrivateNetwork: false, allowInsecureHttp: true }, resolveCredential: () => null },
+      {
+        network: { allowPrivateNetwork: false, allowInsecureHttp: true },
+        resolveCredential: () => null,
+      },
       5000,
     );
     expect(outcome).toMatchObject({ result: 'DISCONNECTED', errorCode: 'DESTINATION_NOT_ALLOWED' });

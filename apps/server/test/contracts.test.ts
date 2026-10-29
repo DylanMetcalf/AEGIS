@@ -6,7 +6,11 @@ import {
   executionPreconditionErrors,
   type DefensiveAction,
 } from '../src/contracts/defensive-action.js';
-import { evidenceReferenceSchema, isConfirmedEvidence, type EvidenceReference } from '../src/contracts/evidence.js';
+import {
+  evidenceReferenceSchema,
+  isConfirmedEvidence,
+  type EvidenceReference,
+} from '../src/contracts/evidence.js';
 import { recoveryReadiness } from '../src/contracts/recovery.js';
 import { isOperationPermitted, resourceBudgetSchema } from '../src/contracts/resource-budget.js';
 import { aggregateVerification, type VerificationCheck } from '../src/contracts/verification.js';
@@ -32,9 +36,9 @@ describe('defensive action contract', () => {
   });
 
   it('has no working executor in Phase 1', async () => {
-    await expect(DisabledActionExecutor.execute(action(), AbortSignal.timeout(1000))).rejects.toBeInstanceOf(
-      ActionExecutionDisabledError,
-    );
+    await expect(
+      DisabledActionExecutor.execute(action(), AbortSignal.timeout(1000)),
+    ).rejects.toBeInstanceOf(ActionExecutionDisabledError);
   });
 
   it('accepts a fully authorized, approved, recoverable action', () => {
@@ -43,17 +47,29 @@ describe('defensive action contract', () => {
 
   it('rejects unauthorized, self-approved, unrecoverable, or unverified actions', () => {
     expect(executionPreconditionErrors(action({ status: 'PROPOSED' }))).toContain('NOT_AUTHORIZED');
-    expect(executionPreconditionErrors(action({ approvals: [] }))).toContain('INSUFFICIENT_APPROVALS');
+    expect(executionPreconditionErrors(action({ approvals: [] }))).toContain(
+      'INSUFFICIENT_APPROVALS',
+    );
     expect(
       executionPreconditionErrors(action({ approvals: [{ principalId: 'requester', at: '' }] })),
     ).toContain('SELF_APPROVAL');
-    expect(executionPreconditionErrors(action({ recoveryRef: null }))).toContain('NO_RECOVERY_PLAN');
+    expect(executionPreconditionErrors(action({ recoveryRef: null }))).toContain(
+      'NO_RECOVERY_PLAN',
+    );
     expect(
-      executionPreconditionErrors(action({ preconditions: [{ description: 'x', verified: false }] })),
+      executionPreconditionErrors(
+        action({ preconditions: [{ description: 'x', verified: false }] }),
+      ),
     ).toContain('UNVERIFIED_PRECONDITION');
     expect(
       executionPreconditionErrors(
-        action({ riskTier: 'CRITICAL', approvals: [{ principalId: 'a', at: '' }, { principalId: 'a', at: '' }] }),
+        action({
+          riskTier: 'CRITICAL',
+          approvals: [
+            { principalId: 'a', at: '' },
+            { principalId: 'a', at: '' },
+          ],
+        }),
       ),
     ).toContain('DUPLICATE_APPROVER');
   });
@@ -88,7 +104,14 @@ describe('evidence contract', () => {
       expect(isConfirmedEvidence(ev({ kind }))).toBe(false);
     }
     expect(
-      isConfirmedEvidence(ev({ provenance: { ...ev().provenance, collector: { type: 'AI_MODEL', id: 'm', version: '1' } } })),
+      isConfirmedEvidence(
+        ev({
+          provenance: {
+            ...ev().provenance,
+            collector: { type: 'AI_MODEL', id: 'm', version: '1' },
+          },
+        }),
+      ),
     ).toBe(false);
     expect(isConfirmedEvidence(ev({ verificationStatus: 'NOT_RUN' }))).toBe(false);
     expect(isConfirmedEvidence(ev({ expiresAt: '2000-01-01T00:00:00Z' }))).toBe(false);
@@ -97,7 +120,10 @@ describe('evidence contract', () => {
 
 describe('verification aggregation', () => {
   const now = new Date('2026-06-01T00:00:00Z');
-  const c = (status: VerificationCheck['status'], o: Partial<VerificationCheck> = {}): VerificationCheck => ({
+  const c = (
+    status: VerificationCheck['status'],
+    o: Partial<VerificationCheck> = {},
+  ): VerificationCheck => ({
     key: Math.random().toString(),
     required: true,
     status,
@@ -111,7 +137,9 @@ describe('verification aggregation', () => {
 
   it('is VERIFIED only when every required check passed and is fresh', () => {
     expect(agg([c('VERIFIED'), c('VERIFIED')])).toBe('VERIFIED');
-    expect(agg([c('VERIFIED'), c('VERIFIED', { observedAt: '2026-01-01T00:00:00Z' })])).toBe('STALE');
+    expect(agg([c('VERIFIED'), c('VERIFIED', { observedAt: '2026-01-01T00:00:00Z' })])).toBe(
+      'STALE',
+    );
     expect(agg([c('VERIFIED'), c('NOT_RUN')])).toBe('PARTIALLY_VERIFIED');
   });
 
@@ -149,10 +177,13 @@ describe('resource budgets', () => {
     const parsed = resourceBudgetSchema.parse(budget);
     expect(isOperationPermitted(parsed, 'integration.health_check')).toBe(true);
     expect(isOperationPermitted(parsed, 'asset.delete')).toBe(false);
-    expect(resourceBudgetSchema.safeParse({ ...budget, timeBudgetMs: 10_000_000 }).success).toBe(false);
+    expect(resourceBudgetSchema.safeParse({ ...budget, timeBudgetMs: 10_000_000 }).success).toBe(
+      false,
+    );
     expect(resourceBudgetSchema.safeParse({ ...budget, maxRetries: 1000 }).success).toBe(false);
     expect(
-      resourceBudgetSchema.safeParse({ ...budget, deniedOperations: ['integration.health_check'] }).success,
+      resourceBudgetSchema.safeParse({ ...budget, deniedOperations: ['integration.health_check'] })
+        .success,
     ).toBe(false);
   });
 });
@@ -171,6 +202,8 @@ describe('recovery readiness', () => {
       lastExerciseResult: 'VERIFIED' as const,
     };
     expect(recoveryReadiness(plan, 1000)).toBe('STALE');
-    expect(recoveryReadiness({ ...plan, lastExercisedAt: new Date().toISOString() }, 60_000)).toBe('VERIFIED');
+    expect(recoveryReadiness({ ...plan, lastExercisedAt: new Date().toISOString() }, 60_000)).toBe(
+      'VERIFIED',
+    );
   });
 });

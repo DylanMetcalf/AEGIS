@@ -50,7 +50,8 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
   /** Verify a password for an already-authenticated principal, with throttling. */
   async function verifyOwnPassword(principalId: string, email: string, password: string) {
     const key = accountKey(email);
-    if (await withTransaction(pool, NO_CONTEXT, (c) => isLocked(c, [key]))) throw Errors.rateLimited();
+    if (await withTransaction(pool, NO_CONTEXT, (c) => isLocked(c, [key])))
+      throw Errors.rateLimited();
     const { rows } = await pool.query<{ password_hash: string | null }>(
       'SELECT password_hash FROM principals WHERE id = $1',
       [principalId],
@@ -73,8 +74,14 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
       const base = { ...auditBase(req), tenantId: null, action: 'auth.login' };
       const logAuditError = (err: unknown) => req.log.error({ err }, 'failed to audit login');
 
-      if (await withTransaction(pool, NO_CONTEXT, (c) => isLocked(c, [keys.account, keys.client]))) {
-        await recordAuditIndependently(pool, { ...base, outcome: 'DENIED', reasonCode: 'THROTTLED' }, logAuditError);
+      if (
+        await withTransaction(pool, NO_CONTEXT, (c) => isLocked(c, [keys.account, keys.client]))
+      ) {
+        await recordAuditIndependently(
+          pool,
+          { ...base, outcome: 'DENIED', reasonCode: 'THROTTLED' },
+          logAuditError,
+        );
         throw Errors.rateLimited();
       }
 
@@ -122,7 +129,8 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
               WHERE m.principal_id = $1 AND m.status = 'ACTIVE' AND t.status = 'ACTIVE'`,
             [principal.id],
           );
-          const activeTenantId = memberships.rows.length === 1 ? memberships.rows[0]!.tenant_id : null;
+          const activeTenantId =
+            memberships.rows.length === 1 ? memberships.rows[0]!.tenant_id : null;
           const session = await createSession(client, {
             principalId: principal.id,
             activeTenantId,
@@ -142,7 +150,9 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
         },
       );
       setSessionCookie(reply, config, created.token);
-      return reply.status(200).send({ authenticated: true, expiresAt: created.expiresAt.toISOString() });
+      return reply
+        .status(200)
+        .send({ authenticated: true, expiresAt: created.expiresAt.toISOString() });
     },
   );
 
@@ -168,19 +178,23 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
 
   app.post('/api/auth/logout-all', { config: { auth: 'session' } }, async (req, reply) => {
     const actor = requireActor(req);
-    const count = await withTransaction(pool, { tenantId: null, principalId: actor.principalId }, async (c) => {
-      const n = await revokeSessionsForPrincipal(c, actor.principalId, 'LOGOUT_ALL');
-      await recordAudit(c, {
-        ...auditBase(req),
-        tenantId: null,
-        action: 'auth.logout_all',
-        outcome: 'SUCCESS',
-        targetType: 'principal',
-        targetId: actor.principalId,
-        metadata: { sessionsRevoked: n },
-      });
-      return n;
-    });
+    const count = await withTransaction(
+      pool,
+      { tenantId: null, principalId: actor.principalId },
+      async (c) => {
+        const n = await revokeSessionsForPrincipal(c, actor.principalId, 'LOGOUT_ALL');
+        await recordAudit(c, {
+          ...auditBase(req),
+          tenantId: null,
+          action: 'auth.logout_all',
+          outcome: 'SUCCESS',
+          targetType: 'principal',
+          targetId: actor.principalId,
+          metadata: { sessionsRevoked: n },
+        });
+        return n;
+      },
+    );
     clearSessionCookie(reply, config);
     return reply.status(200).send({ sessionsRevoked: count });
   });
@@ -197,26 +211,36 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
       if (!ok) {
         await recordAuditIndependently(
           pool,
-          { ...auditBase(req), tenantId: null, action: 'auth.reauthenticate', outcome: 'DENIED', reasonCode: 'INVALID_CREDENTIALS' },
+          {
+            ...auditBase(req),
+            tenantId: null,
+            action: 'auth.reauthenticate',
+            outcome: 'DENIED',
+            reasonCode: 'INVALID_CREDENTIALS',
+          },
           (err) => req.log.error({ err }, 'failed to audit reauthentication'),
         );
         throw Errors.invalidCredentials();
       }
-      const until = await withTransaction(pool, { tenantId: null, principalId: actor.principalId }, async (c) => {
-        const { rows } = await c.query<{ reauthenticated_at: Date }>(
-          'UPDATE sessions SET reauthenticated_at = now() WHERE id = $1 RETURNING reauthenticated_at',
-          [actor.sessionId],
-        );
-        await recordAudit(c, {
-          ...auditBase(req),
-          tenantId: null,
-          action: 'auth.reauthenticate',
-          outcome: 'SUCCESS',
-          targetType: 'session',
-          targetId: actor.sessionId,
-        });
-        return new Date(rows[0]!.reauthenticated_at.getTime() + config.session.reauthWindowMs);
-      });
+      const until = await withTransaction(
+        pool,
+        { tenantId: null, principalId: actor.principalId },
+        async (c) => {
+          const { rows } = await c.query<{ reauthenticated_at: Date }>(
+            'UPDATE sessions SET reauthenticated_at = now() WHERE id = $1 RETURNING reauthenticated_at',
+            [actor.sessionId],
+          );
+          await recordAudit(c, {
+            ...auditBase(req),
+            tenantId: null,
+            action: 'auth.reauthenticate',
+            outcome: 'SUCCESS',
+            targetType: 'session',
+            targetId: actor.sessionId,
+          });
+          return new Date(rows[0]!.reauthenticated_at.getTime() + config.session.reauthWindowMs);
+        },
+      );
       return reply.send({ reauthenticatedUntil: until.toISOString() });
     },
   );
@@ -232,30 +256,47 @@ export const authRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
       if (!(await verifyOwnPassword(actor.principalId, email, body.currentPassword))) {
         await recordAuditIndependently(
           pool,
-          { ...auditBase(req), tenantId: null, action: 'auth.password_change', outcome: 'DENIED', reasonCode: 'INVALID_CREDENTIALS' },
+          {
+            ...auditBase(req),
+            tenantId: null,
+            action: 'auth.password_change',
+            outcome: 'DENIED',
+            reasonCode: 'INVALID_CREDENTIALS',
+          },
           (err) => req.log.error({ err }, 'failed to audit password change'),
         );
         throw Errors.invalidCredentials();
       }
       const newHash = await hashPassword(body.newPassword);
-      const revoked = await withTransaction(pool, { tenantId: null, principalId: actor.principalId }, async (c) => {
-        await c.query(
-          'UPDATE principals SET password_hash = $2, password_changed_at = now() WHERE id = $1',
-          [actor.principalId, newHash],
-        );
-        const n = await revokeSessionsForPrincipal(c, actor.principalId, 'PASSWORD_CHANGED', actor.sessionId);
-        await c.query('UPDATE sessions SET reauthenticated_at = now() WHERE id = $1', [actor.sessionId]);
-        await recordAudit(c, {
-          ...auditBase(req),
-          tenantId: null,
-          action: 'auth.password_change',
-          outcome: 'SUCCESS',
-          targetType: 'principal',
-          targetId: actor.principalId,
-          metadata: { otherSessionsRevoked: n },
-        });
-        return n;
-      });
+      const revoked = await withTransaction(
+        pool,
+        { tenantId: null, principalId: actor.principalId },
+        async (c) => {
+          await c.query(
+            'UPDATE principals SET password_hash = $2, password_changed_at = now() WHERE id = $1',
+            [actor.principalId, newHash],
+          );
+          const n = await revokeSessionsForPrincipal(
+            c,
+            actor.principalId,
+            'PASSWORD_CHANGED',
+            actor.sessionId,
+          );
+          await c.query('UPDATE sessions SET reauthenticated_at = now() WHERE id = $1', [
+            actor.sessionId,
+          ]);
+          await recordAudit(c, {
+            ...auditBase(req),
+            tenantId: null,
+            action: 'auth.password_change',
+            outcome: 'SUCCESS',
+            targetType: 'principal',
+            targetId: actor.principalId,
+            metadata: { otherSessionsRevoked: n },
+          });
+          return n;
+        },
+      );
       return reply.send({ otherSessionsRevoked: revoked });
     },
   );

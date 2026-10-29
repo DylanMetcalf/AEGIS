@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { inject } from 'vitest';
 import { assertRuntimeRoleIsRestricted, createPool } from '../src/db/pool.js';
-import { MIGRATIONS_DIR, MigrationIntegrityError, loadMigrationFiles, migrate } from '../src/db/migrate.js';
+import {
+  MIGRATIONS_DIR,
+  MigrationIntegrityError,
+  loadMigrationFiles,
+  migrate,
+} from '../src/db/migrate.js';
 import { owner } from './helpers.js';
 
 const dirs: string[] = [];
@@ -20,7 +25,9 @@ function copyMigrations(): string {
 describe('migrations', () => {
   it('records every migration with its checksum', async () => {
     const files = loadMigrationFiles();
-    const { rows } = await owner().query('SELECT version, checksum FROM schema_migrations ORDER BY version');
+    const { rows } = await owner().query(
+      'SELECT version, checksum FROM schema_migrations ORDER BY version',
+    );
     expect(rows).toEqual(files.map((f) => ({ version: f.version, checksum: f.checksum })));
   });
 
@@ -37,7 +44,9 @@ describe('migrations', () => {
   it('refuses to run when the database has a migration this build does not know', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aegis-mig-empty-'));
     dirs.push(dir);
-    await expect(migrate(inject('db').ownerUrl, { dir })).rejects.toThrow(/not present in this build/);
+    await expect(migrate(inject('db').ownerUrl, { dir })).rejects.toThrow(
+      /not present in this build/,
+    );
   });
 
   it('rolls back a failing migration completely', async () => {
@@ -49,7 +58,9 @@ describe('migrations', () => {
     await expect(migrate(inject('db').ownerUrl, { dir })).rejects.toThrow();
     const { rows } = await owner().query("SELECT to_regclass('public.should_not_exist') AS t");
     expect(rows[0].t).toBeNull();
-    const { rows: ledger } = await owner().query("SELECT 1 FROM schema_migrations WHERE version = '9999'");
+    const { rows: ledger } = await owner().query(
+      "SELECT 1 FROM schema_migrations WHERE version = '9999'",
+    );
     expect(ledger).toHaveLength(0);
   });
 

@@ -6,7 +6,7 @@ import {
   type IntegrationStatus,
 } from '@aegis/shared';
 import type { DbClient } from '../db/pool.js';
-import { decodeCursor, encodeCursor } from '../http/cursor.js';
+import { decodeTimestampCursor, encodeCursor } from '../http/cursor.js';
 import { Errors } from '../http/errors.js';
 import type { UrlPolicy } from '../security/safe-http.js';
 import { ProviderConfigError } from './providers/types.js';
@@ -37,7 +37,12 @@ const COLUMNS = `id, tenant_id, name, provider, status, config, config_version, 
   declared_capabilities, granted_permissions, asset_id, last_health_status, last_health_at,
   last_error_code, revoked_at, version, created_at, updated_at`;
 
-const HEALTH_STATES: readonly IntegrationStatus[] = ['CONNECTED', 'DEGRADED', 'DISCONNECTED', 'UNKNOWN'];
+const HEALTH_STATES: readonly IntegrationStatus[] = [
+  'CONNECTED',
+  'DEGRADED',
+  'DISCONNECTED',
+  'UNKNOWN',
+];
 
 export function effectiveStatus(
   row: Pick<IntegrationRow, 'status' | 'last_health_at'>,
@@ -103,7 +108,7 @@ export async function listIntegrations(
   tenantId: string,
   opts: { limit: number; cursor?: string },
 ): Promise<{ rows: IntegrationRow[]; nextCursor: string | null }> {
-  const cursor = decodeCursor(opts.cursor);
+  const cursor = decodeTimestampCursor(opts.cursor);
   const params: unknown[] = [tenantId];
   let where = 'tenant_id = $1';
   if (cursor) {
@@ -137,24 +142,34 @@ function validateProviderInput(
 ) {
   const provider = providers.get(providerId);
   if (!provider) {
-    throw Errors.unprocessable('UNSUPPORTED_PROVIDER', 'This integration provider is not available');
+    throw Errors.unprocessable(
+      'UNSUPPORTED_PROVIDER',
+      'This integration provider is not available',
+    );
   }
   let normalized: unknown;
   try {
     normalized = provider.validateConfig(config, network);
   } catch (err) {
     if (err instanceof ProviderConfigError) {
-      throw Errors.validation(err.issues.map((i) => ({ path: `config.${i.path}`, message: i.message })));
+      throw Errors.validation(
+        err.issues.map((i) => ({ path: `config.${i.path}`, message: i.message })),
+      );
     }
     throw err;
   }
   if (credentialRef && !provider.supportsCredential) {
-    throw Errors.validation([{ path: 'credentialRef', message: 'Provider does not accept credentials' }]);
+    throw Errors.validation([
+      { path: 'credentialRef', message: 'Provider does not accept credentials' },
+    ]);
   }
   const unknown = unknownPermissions(provider, grantedPermissions);
   if (unknown.length > 0) {
     throw Errors.validation([
-      { path: 'grantedPermissions', message: `Unknown permissions for provider: ${unknown.join(', ')}` },
+      {
+        path: 'grantedPermissions',
+        message: `Unknown permissions for provider: ${unknown.join(', ')}`,
+      },
     ]);
   }
   return { provider, config: normalized as Record<string, unknown> };
@@ -229,10 +244,12 @@ export async function updateIntegration(
   network: UrlPolicy,
 ): Promise<{ row: IntegrationRow; changed: string[] }> {
   if (existing.status === 'REVOKED') throw Errors.invalidTransition('REVOKED', 'CONFIGURED');
-  if (existing.version !== input.version) throw Errors.conflict('The integration was modified by someone else');
+  if (existing.version !== input.version)
+    throw Errors.conflict('The integration was modified by someone else');
 
   const nextConfig = input.config ?? existing.config;
-  const nextCredential = input.credentialRef !== undefined ? input.credentialRef : existing.credential_ref;
+  const nextCredential =
+    input.credentialRef !== undefined ? input.credentialRef : existing.credential_ref;
   const nextPermissions = input.grantedPermissions ?? existing.granted_permissions;
   const { config } = validateProviderInput(
     providers,
@@ -246,8 +263,10 @@ export async function updateIntegration(
 
   const changed: string[] = [];
   if (input.name !== undefined && input.name !== existing.name) changed.push('name');
-  if (input.config !== undefined && JSON.stringify(config) !== JSON.stringify(existing.config)) changed.push('config');
-  if (input.credentialRef !== undefined && input.credentialRef !== existing.credential_ref) changed.push('credentialRef');
+  if (input.config !== undefined && JSON.stringify(config) !== JSON.stringify(existing.config))
+    changed.push('config');
+  if (input.credentialRef !== undefined && input.credentialRef !== existing.credential_ref)
+    changed.push('credentialRef');
   if (input.grantedPermissions !== undefined) changed.push('grantedPermissions');
   if (input.assetId !== undefined && input.assetId !== existing.asset_id) changed.push('assetId');
 
@@ -297,7 +316,8 @@ export async function transitionIntegration(
   to: IntegrationStatus,
   version: number,
 ): Promise<IntegrationRow> {
-  if (existing.version !== version) throw Errors.conflict('The integration was modified by someone else');
+  if (existing.version !== version)
+    throw Errors.conflict('The integration was modified by someone else');
   if (!integrationStateMachine.canTransition(existing.status, to)) {
     throw Errors.invalidTransition(existing.status, to);
   }

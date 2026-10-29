@@ -30,9 +30,13 @@ describe('tenant isolation through the API', () => {
     const id = created.json().id;
 
     expect((await a.client.get(`/api/assets/${id}`)).statusCode).toBe(404);
-    expect((await a.client.patch(`/api/assets/${id}`, { version: 1, name: 'pwned' })).statusCode).toBe(404);
+    expect(
+      (await a.client.patch(`/api/assets/${id}`, { version: 1, name: 'pwned' })).statusCode,
+    ).toBe(404);
     expect((await a.client.delete(`/api/assets/${id}`)).statusCode).toBe(404);
-    expect((await a.client.get('/api/assets')).json().items.map((x: { id: string }) => x.id)).not.toContain(id);
+    expect(
+      (await a.client.get('/api/assets')).json().items.map((x: { id: string }) => x.id),
+    ).not.toContain(id);
 
     const still = await b.client.get(`/api/assets/${id}`);
     expect(still.statusCode).toBe(200);
@@ -44,7 +48,10 @@ describe('tenant isolation through the API', () => {
     const b = await memberClient(ctx, 'TENANT_ADMIN');
     const res = await a.client.post('/api/assets', { ...validAsset(), tenantId: b.tenantId });
     expect(res.statusCode).toBe(400);
-    const { rows } = await owner().query('SELECT count(*)::int AS n FROM assets WHERE tenant_id = $1', [b.tenantId]);
+    const { rows } = await owner().query(
+      'SELECT count(*)::int AS n FROM assets WHERE tenant_id = $1',
+      [b.tenantId],
+    );
     expect(rows[0].n).toBe(0);
   });
 
@@ -54,14 +61,19 @@ describe('tenant isolation through the API', () => {
     const res = await a.client.put('/api/session/tenant', { tenantId: other });
     expect(res.statusCode).toBe(403);
     expect((await a.client.get('/api/session')).json().activeTenant.id).toBe(a.tenantId);
-    const events = await auditEvents("action = 'session.tenant_select' AND outcome = 'DENIED' AND target_id = $1", [other]);
+    const events = await auditEvents(
+      "action = 'session.tenant_select' AND outcome = 'DENIED' AND target_id = $1",
+      [other],
+    );
     expect(events).toHaveLength(1);
   });
 
   it('cuts off access immediately when membership is suspended', async () => {
     const a = await memberClient(ctx, 'TENANT_ADMIN');
     expect((await a.client.get('/api/assets')).statusCode).toBe(200);
-    await owner().query("UPDATE memberships SET status = 'SUSPENDED' WHERE principal_id = $1", [a.user.id]);
+    await owner().query("UPDATE memberships SET status = 'SUSPENDED' WHERE principal_id = $1", [
+      a.user.id,
+    ]);
     expect((await a.client.get('/api/assets')).statusCode).toBe(403);
   });
 
@@ -75,7 +87,9 @@ describe('tenant isolation through the API', () => {
     expect((await client.get('/api/session')).json().activeTenant).toBeNull();
     const res = await client.get('/api/assets');
     expect(res.statusCode).toBe(403);
-    const denial = await auditEvents("action = 'authz.denied' AND actor_principal_id = $1", [user.id]);
+    const denial = await auditEvents("action = 'authz.denied' AND actor_principal_id = $1", [
+      user.id,
+    ]);
     expect(denial.at(-1)!.reason_code).toBe('NO_TENANT_CONTEXT');
   });
 
@@ -111,12 +125,16 @@ describe('row-level security in the database', () => {
 
   it('hides other tenants’ rows even when the query omits a tenant filter', async () => {
     const { tA, tB, assetB } = await seed();
-    const rows = await withTransaction(ctx.pool, { tenantId: tA, principalId: null }, async (c) =>
-      (await c.query('SELECT id, tenant_id FROM assets WHERE id = $1', [assetB])).rows,
+    const rows = await withTransaction(
+      ctx.pool,
+      { tenantId: tA, principalId: null },
+      async (c) => (await c.query('SELECT id, tenant_id FROM assets WHERE id = $1', [assetB])).rows,
     );
     expect(rows).toHaveLength(0);
-    const visible = await withTransaction(ctx.pool, { tenantId: tB, principalId: null }, async (c) =>
-      (await c.query('SELECT id FROM assets WHERE id = $1', [assetB])).rows,
+    const visible = await withTransaction(
+      ctx.pool,
+      { tenantId: tB, principalId: null },
+      async (c) => (await c.query('SELECT id FROM assets WHERE id = $1', [assetB])).rows,
     );
     expect(visible).toHaveLength(1);
   });
@@ -136,10 +154,14 @@ describe('row-level security in the database', () => {
 
   it('silently affects zero rows for cross-tenant UPDATE and DELETE', async () => {
     const { tA, assetB } = await seed();
-    const counts = await withTransaction(ctx.pool, { tenantId: tA, principalId: null }, async (c) => [
-      (await c.query("UPDATE assets SET name = 'x' WHERE id = $1", [assetB])).rowCount,
-      (await c.query('DELETE FROM assets WHERE id = $1', [assetB])).rowCount,
-    ]);
+    const counts = await withTransaction(
+      ctx.pool,
+      { tenantId: tA, principalId: null },
+      async (c) => [
+        (await c.query("UPDATE assets SET name = 'x' WHERE id = $1", [assetB])).rowCount,
+        (await c.query('DELETE FROM assets WHERE id = $1', [assetB])).rowCount,
+      ],
+    );
     expect(counts).toEqual([0, 0]);
     const { rows } = await owner().query('SELECT name FROM assets WHERE id = $1', [assetB]);
     expect(rows[0].name).toBe('b-asset');
@@ -172,11 +194,15 @@ describe('row-level security in the database', () => {
 
   it('does not leak tenant context between pooled connections', async () => {
     const { tB } = await seed();
-    await withTransaction(ctx.pool, { tenantId: tB, principalId: null }, (c) => c.query('SELECT 1'));
+    await withTransaction(ctx.pool, { tenantId: tB, principalId: null }, (c) =>
+      c.query('SELECT 1'),
+    );
     // Exhaust the pool so the same physical connections are reused.
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>
-        ctx.pool.query<{ t: string | null }>("SELECT current_setting('aegis.tenant_id', true) AS t"),
+        ctx.pool.query<{ t: string | null }>(
+          "SELECT current_setting('aegis.tenant_id', true) AS t",
+        ),
       ),
     );
     for (const r of results) expect(r.rows[0]!.t ?? '').toBe('');
@@ -184,7 +210,9 @@ describe('row-level security in the database', () => {
 
   it('rejects malformed tenant context before touching the database', async () => {
     await expect(
-      withTransaction(ctx.pool, { tenantId: "x' OR '1'='1", principalId: null }, (c) => c.query('SELECT 1')),
+      withTransaction(ctx.pool, { tenantId: "x' OR '1'='1", principalId: null }, (c) =>
+        c.query('SELECT 1'),
+      ),
     ).rejects.toThrow(/Invalid tenant context/);
   });
 

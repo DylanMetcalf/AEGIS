@@ -70,10 +70,11 @@ const MAINTENANCE_MS = 10 * 60_000;
 const VERSION = '0.1.0';
 
 export class Worker {
-  readonly workerId = `${hostname().slice(0, 40)}:${process.pid}:${Math.random().toString(36).slice(2, 8)}`.replace(
-    /[^A-Za-z0-9_.:-]/g,
-    '_',
-  );
+  readonly workerId =
+    `${hostname().slice(0, 40)}:${process.pid}:${Math.random().toString(36).slice(2, 8)}`.replace(
+      /[^A-Za-z0-9_.:-]/g,
+      '_',
+    );
   private readonly handlers = new Map<string, JobHandler<unknown>>();
   private readonly inFlight = new Set<Promise<void>>();
   private readonly shutdown = new AbortController();

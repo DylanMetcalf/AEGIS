@@ -1,10 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
-import {
-  HEALTH_CHECK_CAPABILITY,
-  ProviderConfigError,
-  type IntegrationProvider,
-} from './types.js';
+import { HEALTH_CHECK_CAPABILITY, ProviderConfigError, type IntegrationProvider } from './types.js';
 
 /**
  * TEST ADAPTER — NOT A PRODUCTION CONNECTION.
@@ -75,7 +71,11 @@ export const testAdapterProvider: IntegrationProvider<TestAdapterConfig> = {
       case 'healthy':
         return { result: 'CONNECTED', latencyMs: config.latencyMs, errorCode: null };
       case 'degraded':
-        return { result: 'DEGRADED', latencyMs: config.latencyMs, errorCode: 'SIMULATED_DEGRADATION' };
+        return {
+          result: 'DEGRADED',
+          latencyMs: config.latencyMs,
+          errorCode: 'SIMULATED_DEGRADATION',
+        };
       case 'unreachable':
         return { result: 'DISCONNECTED', latencyMs: null, errorCode: 'CONNECTION_REFUSED' };
       case 'auth_failure':

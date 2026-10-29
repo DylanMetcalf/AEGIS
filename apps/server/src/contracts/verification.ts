@@ -33,7 +33,8 @@ export function aggregateVerification(
     if (c.status === 'VERIFIED' || c.status === 'PARTIALLY_VERIFIED') {
       const age = c.observedAt ? now.getTime() - Date.parse(c.observedAt) : Infinity;
       if (!(age <= opts.maxAgeMs)) return { ...c, status: 'STALE' };
-      if (opts.requireIndependentVerifier && !c.verifier.independent) return { ...c, status: 'INCONCLUSIVE' };
+      if (opts.requireIndependentVerifier && !c.verifier.independent)
+        return { ...c, status: 'INCONCLUSIVE' };
     }
     return c;
   });
@@ -54,7 +55,8 @@ export function aggregateVerification(
   const relevant = required.filter((c) => c.status !== 'NOT_APPLICABLE');
   if (relevant.every((c) => c.status === 'VERIFIED')) return result('VERIFIED');
   if (relevant.every((c) => c.status === 'NOT_RUN')) return result('NOT_RUN');
-  if (has('STALE') && relevant.every((c) => c.status === 'VERIFIED' || c.status === 'STALE')) return result('STALE');
+  if (has('STALE') && relevant.every((c) => c.status === 'VERIFIED' || c.status === 'STALE'))
+    return result('STALE');
   if (relevant.some((c) => c.status === 'VERIFIED' || c.status === 'PARTIALLY_VERIFIED')) {
     return result('PARTIALLY_VERIFIED');
   }

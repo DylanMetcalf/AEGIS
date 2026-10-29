@@ -18,7 +18,11 @@ export interface RecoveryPlan {
   lastExerciseResult: VerificationStatus;
 }
 
-export function recoveryReadiness(plan: RecoveryPlan | null, maxAgeMs: number, now = new Date()): VerificationStatus {
+export function recoveryReadiness(
+  plan: RecoveryPlan | null,
+  maxAgeMs: number,
+  now = new Date(),
+): VerificationStatus {
   if (!plan || !plan.lastExercisedAt) return 'NOT_RUN';
   if (now.getTime() - Date.parse(plan.lastExercisedAt) > maxAgeMs) return 'STALE';
   return plan.lastExerciseResult;

@@ -18,11 +18,12 @@ export class AppError extends Error {
 }
 
 export const Errors = {
-  validation: (details?: { path: string; message: string }[], message = 'Request validation failed') =>
-    new AppError(400, 'VALIDATION_FAILED', message, details),
+  validation: (
+    details?: { path: string; message: string }[],
+    message = 'Request validation failed',
+  ) => new AppError(400, 'VALIDATION_FAILED', message, details),
   unauthenticated: () => new AppError(401, 'UNAUTHENTICATED', 'Authentication required'),
-  invalidCredentials: () =>
-    new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password'),
+  invalidCredentials: () => new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password'),
   forbidden: () => new AppError(403, 'FORBIDDEN', 'You are not permitted to perform this action'),
   reauthRequired: () =>
     new AppError(403, 'REAUTHENTICATION_REQUIRED', 'Confirm your password to continue'),
@@ -51,7 +52,12 @@ export function fromZod(err: ZodError): AppError {
 }
 
 /** Parse untrusted input with a schema, throwing a safe validation error. */
-export function parse<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false; error: ZodError } }, value: unknown): T {
+export function parse<T>(
+  schema: {
+    safeParse(v: unknown): { success: true; data: T } | { success: false; error: ZodError };
+  },
+  value: unknown,
+): T {
   const result = schema.safeParse(value);
   if (!result.success) throw fromZod(result.error);
   return result.data;

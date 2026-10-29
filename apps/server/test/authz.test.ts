@@ -28,13 +28,19 @@ function actor(overrides: Partial<Actor> = {}): Actor {
   };
 }
 
-const check = (a: Actor | null, cap: string, extra: Partial<Parameters<typeof authorize>[2]> = {}) =>
-  authorize(a, cap, { reauthWindowMs: WINDOW, ...extra });
+const check = (
+  a: Actor | null,
+  cap: string,
+  extra: Partial<Parameters<typeof authorize>[2]> = {},
+) => authorize(a, cap, { reauthWindowMs: WINDOW, ...extra });
 
 describe('authorize', () => {
   it('denies when there is no actor or the capability is unknown', () => {
     expect(check(null, 'asset.read')).toEqual({ allowed: false, reason: 'NO_ACTOR' });
-    expect(check(actor(), 'asset.obliterate')).toEqual({ allowed: false, reason: 'UNKNOWN_CAPABILITY' });
+    expect(check(actor(), 'asset.obliterate')).toEqual({
+      allowed: false,
+      reason: 'UNKNOWN_CAPABILITY',
+    });
     expect(check(actor(), '__proto__')).toEqual({ allowed: false, reason: 'UNKNOWN_CAPABILITY' });
   });
 
@@ -52,7 +58,9 @@ describe('authorize', () => {
   });
 
   it('denies resources belonging to another tenant even when the role allows the action', () => {
-    expect(check(actor(), 'asset.read', { resource: { type: 'asset', tenantId: T2, id: 'x' } })).toEqual({
+    expect(
+      check(actor(), 'asset.read', { resource: { type: 'asset', tenantId: T2, id: 'x' } }),
+    ).toEqual({
       allowed: false,
       reason: 'TENANT_MISMATCH',
     });
@@ -80,11 +88,17 @@ describe('authorize', () => {
 
   it('requires recent reauthentication for sensitive operations', () => {
     const stale = actor({ reauthenticatedAt: new Date(Date.now() - WINDOW - 1000) });
-    expect(check(stale, 'membership.manage')).toEqual({ allowed: false, reason: 'REAUTH_REQUIRED' });
-    expect(check(actor({ reauthenticatedAt: null }), 'integration.credential.manage').allowed).toBe(false);
-    expect(check(actor({ reauthenticatedAt: new Date(Date.now() + 3600_000) }), 'membership.manage').allowed).toBe(
+    expect(check(stale, 'membership.manage')).toEqual({
+      allowed: false,
+      reason: 'REAUTH_REQUIRED',
+    });
+    expect(check(actor({ reauthenticatedAt: null }), 'integration.credential.manage').allowed).toBe(
       false,
     );
+    expect(
+      check(actor({ reauthenticatedAt: new Date(Date.now() + 3600_000) }), 'membership.manage')
+        .allowed,
+    ).toBe(false);
     expect(check(actor(), 'membership.manage').allowed).toBe(true);
   });
 
@@ -94,44 +108,78 @@ describe('authorize', () => {
       resource: { type: 'asset', tenantId: T1, environment, criticality },
     });
     expect(check(stale, 'asset.delete', res('STAGING', 'LOW')).allowed).toBe(true);
-    expect(check(stale, 'asset.delete', res('PRODUCTION', 'LOW'))).toEqual({ allowed: false, reason: 'REAUTH_REQUIRED' });
+    expect(check(stale, 'asset.delete', res('PRODUCTION', 'LOW'))).toEqual({
+      allowed: false,
+      reason: 'REAUTH_REQUIRED',
+    });
     expect(check(stale, 'asset.delete', res('STAGING', 'CRITICAL')).allowed).toBe(false);
   });
 
   it('keeps AI workers read-only regardless of role', () => {
     const ai = actor({ kind: 'AI_WORKER', role: 'AI_WORKER', reauthenticatedAt: null });
     expect(check(ai, 'asset.read').allowed).toBe(true);
-    for (const cap of ['asset.create', 'asset.update', 'integration.health_check', 'action.propose']) {
+    for (const cap of [
+      'asset.create',
+      'asset.update',
+      'integration.health_check',
+      'action.propose',
+    ]) {
       expect(check(ai, cap)).toEqual({ allowed: false, reason: 'ACTOR_TYPE_RESTRICTED' });
     }
     // Even if a database inconsistency gave an AI worker an admin role:
     const misassigned = actor({ kind: 'AI_WORKER', role: 'TENANT_ADMIN' });
-    expect(check(misassigned, 'membership.manage')).toEqual({ allowed: false, reason: 'ACTOR_TYPE_RESTRICTED' });
-    expect(check(misassigned, 'asset.delete')).toEqual({ allowed: false, reason: 'ACTOR_TYPE_RESTRICTED' });
+    expect(check(misassigned, 'membership.manage')).toEqual({
+      allowed: false,
+      reason: 'ACTOR_TYPE_RESTRICTED',
+    });
+    expect(check(misassigned, 'asset.delete')).toEqual({
+      allowed: false,
+      reason: 'ACTOR_TYPE_RESTRICTED',
+    });
   });
 
   it('never lets non-human identities perform privileged operations', () => {
     const svc = actor({ kind: 'SERVICE', role: 'TENANT_ADMIN' });
-    expect(check(svc, 'integration.manage')).toEqual({ allowed: false, reason: 'ACTOR_TYPE_RESTRICTED' });
-    expect(check(actor({ kind: 'SERVICE', role: 'SERVICE' }), 'integration.health_check').allowed).toBe(true);
+    expect(check(svc, 'integration.manage')).toEqual({
+      allowed: false,
+      reason: 'ACTOR_TYPE_RESTRICTED',
+    });
+    expect(
+      check(actor({ kind: 'SERVICE', role: 'SERVICE' }), 'integration.health_check').allowed,
+    ).toBe(true);
   });
 
   it('gives the system owner platform capabilities but no tenant data access', () => {
-    const owner = actor({ platformRole: 'SYSTEM_OWNER', tenantId: null, role: null, membershipStatus: null, tenantStatus: null });
+    const owner = actor({
+      platformRole: 'SYSTEM_OWNER',
+      tenantId: null,
+      role: null,
+      membershipStatus: null,
+      tenantStatus: null,
+    });
     expect(check(owner, 'platform.tenant.manage').allowed).toBe(true);
     expect(check(owner, 'asset.read').allowed).toBe(false);
     expect(check(owner, 'audit.read').allowed).toBe(false);
-    expect(check(owner, 'platform.audit.read', { resource: { type: 'audit', tenantId: T1 } })).toEqual({
+    expect(
+      check(owner, 'platform.audit.read', { resource: { type: 'audit', tenantId: T1 } }),
+    ).toEqual({
       allowed: false,
       reason: 'TENANT_MISMATCH',
     });
-    expect(check(actor(), 'platform.tenant.manage')).toEqual({ allowed: false, reason: 'CAPABILITY_NOT_GRANTED' });
+    expect(check(actor(), 'platform.tenant.manage')).toEqual({
+      allowed: false,
+      reason: 'CAPABILITY_NOT_GRANTED',
+    });
   });
 
   it('is deterministic', () => {
     const a = actor({ role: 'SECURITY_OPERATOR' });
-    const first = (Object.keys(CAPABILITIES) as Capability[]).map((c) => check(a, c, { now: new Date(0) }));
-    const second = (Object.keys(CAPABILITIES) as Capability[]).map((c) => check(a, c, { now: new Date(0) }));
+    const first = (Object.keys(CAPABILITIES) as Capability[]).map((c) =>
+      check(a, c, { now: new Date(0) }),
+    );
+    const second = (Object.keys(CAPABILITIES) as Capability[]).map((c) =>
+      check(a, c, { now: new Date(0) }),
+    );
     expect(second).toEqual(first);
   });
 });
@@ -144,13 +192,19 @@ describe('role catalogue', () => {
         expect(CAPABILITIES[cap].scope).toBe('tenant');
       }
     }
-    for (const cap of PLATFORM_ROLE_CAPABILITIES.SYSTEM_OWNER) expect(CAPABILITIES[cap].scope).toBe('platform');
+    for (const cap of PLATFORM_ROLE_CAPABILITIES.SYSTEM_OWNER)
+      expect(CAPABILITIES[cap].scope).toBe('platform');
   });
 
   it('has no superuser role: no tenant role holds every tenant capability', () => {
-    const tenantCaps = (Object.keys(CAPABILITIES) as Capability[]).filter((c) => CAPABILITIES[c].scope === 'tenant');
+    const tenantCaps = (Object.keys(CAPABILITIES) as Capability[]).filter(
+      (c) => CAPABILITIES[c].scope === 'tenant',
+    );
     for (const role of TENANT_ROLES) {
-      expect(tenantCaps.every((c) => TENANT_ROLE_CAPABILITIES[role].includes(c)), role).toBe(false);
+      expect(
+        tenantCaps.every((c) => TENANT_ROLE_CAPABILITIES[role].includes(c)),
+        role,
+      ).toBe(false);
     }
   });
 

@@ -6,7 +6,10 @@ import { createRuntime, createWorker } from './runtime.js';
 /** Standalone worker process (WORKER_ENABLED is ignored here). */
 async function main() {
   const config = loadConfig();
-  const log = pino({ level: config.logLevel, redact: { paths: LOG_REDACT_PATHS, censor: '[REDACTED]' } });
+  const log = pino({
+    level: config.logLevel,
+    redact: { paths: LOG_REDACT_PATHS, censor: '[REDACTED]' },
+  });
   const { pool, providers } = await createRuntime(config);
   const worker = createWorker(config, pool, providers, log);
   const shutdown = async () => {

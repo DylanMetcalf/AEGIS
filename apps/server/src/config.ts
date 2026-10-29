@@ -31,7 +31,10 @@ const envSchema = z
     APP_ORIGIN: z
       .string()
       .url()
-      .refine((v) => new URL(v).origin === v.replace(/\/$/, ''), 'Must be an origin (scheme://host[:port])'),
+      .refine(
+        (v) => new URL(v).origin === v.replace(/\/$/, ''),
+        'Must be an origin (scheme://host[:port])',
+      ),
     TRUST_PROXY: bool(false),
 
     DATABASE_URL: postgresUrl,
@@ -48,7 +51,9 @@ const envSchema = z
     LOGIN_RATE_LIMIT_PER_MINUTE: int(20, 1, 100000),
     BODY_LIMIT_BYTES: int(65536, 1024, 1048576),
 
-    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+    LOG_LEVEL: z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+      .default('info'),
 
     WORKER_ENABLED: bool(true),
     WORKER_CONCURRENCY: int(2, 1, 16),
@@ -65,15 +70,20 @@ const envSchema = z
     const hardened = env.AEGIS_ENV === 'production' || env.AEGIS_ENV === 'staging';
     if (!hardened) return;
     const forbid = (key: keyof typeof env, message: string) =>
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
-    if (!env.SESSION_COOKIE_SECURE) forbid('SESSION_COOKIE_SECURE', 'Must be true outside development');
-    if (!env.APP_ORIGIN.startsWith('https://')) forbid('APP_ORIGIN', 'Must use https outside development');
+      ctx.addIssue({ code: 'custom', path: [key], message });
+    if (!env.SESSION_COOKIE_SECURE)
+      forbid('SESSION_COOKIE_SECURE', 'Must be true outside development');
+    if (!env.APP_ORIGIN.startsWith('https://'))
+      forbid('APP_ORIGIN', 'Must use https outside development');
     if (env.INTEGRATION_ALLOW_PRIVATE_NETWORK)
       forbid('INTEGRATION_ALLOW_PRIVATE_NETWORK', 'Not permitted outside development');
     if (env.INTEGRATION_ALLOW_INSECURE_HTTP)
       forbid('INTEGRATION_ALLOW_INSECURE_HTTP', 'Not permitted outside development');
     if (env.INTEGRATION_TEST_ADAPTER_ENABLED)
-      forbid('INTEGRATION_TEST_ADAPTER_ENABLED', 'Test adapters are not permitted outside development');
+      forbid(
+        'INTEGRATION_TEST_ADAPTER_ENABLED',
+        'Test adapters are not permitted outside development',
+      );
     if (env.LOG_LEVEL === 'trace' || env.LOG_LEVEL === 'debug')
       forbid('LOG_LEVEL', 'debug/trace logging is not permitted outside development');
     if (env.AEGIS_ENV === 'production') {
@@ -149,19 +159,19 @@ function toConfig(env: z.infer<typeof envSchema>) {
 }
 
 /** Error messages that never include the received value. */
-const valueFreeErrorMap: z.ZodErrorMap = (issue, ctx) => {
-  if (issue.code === z.ZodIssueCode.invalid_enum_value) {
-    return { message: `Expected one of: ${issue.options.join(', ')}` };
+const valueFreeError = (issue: z.core.$ZodRawIssue): string | undefined => {
+  if (issue.code === 'invalid_value') {
+    return `Expected one of: ${issue.values.map(String).join(', ')}`;
   }
-  if (issue.code === z.ZodIssueCode.invalid_type) {
-    return { message: issue.received === 'undefined' ? 'Required' : `Expected ${issue.expected}` };
+  if (issue.code === 'invalid_type') {
+    return issue.input === undefined ? 'Required' : `Expected ${issue.expected}`;
   }
-  return { message: ctx.defaultError };
+  return undefined; // zod's default messages describe the rule, not the input
 };
 
 /** Parse configuration from an environment map. Throws ConfigError without leaking values. */
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
-  const result = envSchema.safeParse(source, { errorMap: valueFreeErrorMap });
+  const result = envSchema.safeParse(source, { error: valueFreeError });
   if (!result.success) {
     throw new ConfigError(
       result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),

@@ -43,7 +43,9 @@ export async function checkDatabase(pool: Pool): Promise<ReadinessCheck[]> {
   const expected = latestMigrationVersion();
   try {
     const { rows } = await withTimeout(
-      pool.query<{ version: string | null }>('SELECT max(version) AS version FROM schema_migrations'),
+      pool.query<{ version: string | null }>(
+        'SELECT max(version) AS version FROM schema_migrations',
+      ),
       DB_CHECK_TIMEOUT_MS,
     );
     const current = rows[0]?.version ?? null;
@@ -62,8 +64,20 @@ export async function checkDatabase(pool: Pool): Promise<ReadinessCheck[]> {
     ];
   } catch {
     return [
-      { name: 'database', required: true, state: 'UNAVAILABLE', observedAt, detail: 'Unreachable or timed out' },
-      { name: 'schema', required: true, state: 'UNKNOWN', observedAt, detail: 'Cannot be checked without the database' },
+      {
+        name: 'database',
+        required: true,
+        state: 'UNAVAILABLE',
+        observedAt,
+        detail: 'Unreachable or timed out',
+      },
+      {
+        name: 'schema',
+        required: true,
+        state: 'UNKNOWN',
+        observedAt,
+        detail: 'Cannot be checked without the database',
+      },
     ];
   }
 }
@@ -98,7 +112,12 @@ export async function workerStatus(pool: Pool, config: AppConfig): Promise<Compo
         : `${rows[0]!.workers} worker(s) reporting`,
     };
   } catch {
-    return { ...base, state: 'UNKNOWN', observedAt: null, detail: 'Could not read worker heartbeats' };
+    return {
+      ...base,
+      state: 'UNKNOWN',
+      observedAt: null,
+      detail: 'Could not read worker heartbeats',
+    };
   }
 }
 

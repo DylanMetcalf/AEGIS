@@ -90,10 +90,14 @@ function sortKeys(o: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-export async function getJob(client: DbClient, tenantId: string, id: string): Promise<JobRow | null> {
-  const { rows } = await client.query<JobRow>('SELECT * FROM jobs WHERE tenant_id = $1 AND id = $2', [
-    tenantId,
-    id,
-  ]);
+export async function getJob(
+  client: DbClient,
+  tenantId: string,
+  id: string,
+): Promise<JobRow | null> {
+  const { rows } = await client.query<JobRow>(
+    'SELECT * FROM jobs WHERE tenant_id = $1 AND id = $2',
+    [tenantId, id],
+  );
   return rows[0] ?? null;
 }

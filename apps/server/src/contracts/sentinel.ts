@@ -47,14 +47,50 @@ export interface AssuranceFinding {
  */
 export const SENTINEL_INDEPENDENCE: readonly {
   fn: SentinelObservationKind;
-  requires: ('process' | 'credential' | 'storage' | 'account' | 'administrator' | 'external_logging' | 'deployment')[];
+  requires: (
+    | 'process'
+    | 'credential'
+    | 'storage'
+    | 'account'
+    | 'administrator'
+    | 'external_logging'
+    | 'deployment'
+  )[];
   currentlyShared: string[];
 }[] = [
-  { fn: 'HEALTH', requires: ['process', 'deployment'], currentlyShared: ['process', 'database', 'deployment'] },
-  { fn: 'CONFIG_INTEGRITY', requires: ['process', 'credential', 'storage'], currentlyShared: ['database', 'credentials'] },
-  { fn: 'INTEGRATION_PERMISSION_DRIFT', requires: ['credential', 'process'], currentlyShared: ['integration credentials'] },
-  { fn: 'RESTRICTED_ACTION_REQUEST', requires: ['process', 'credential', 'administrator'], currentlyShared: ['identity provider', 'administrators'] },
-  { fn: 'INDEPENDENT_VERIFICATION', requires: ['process', 'credential', 'storage', 'account'], currentlyShared: ['everything'] },
-  { fn: 'EVIDENCE_FRESHNESS', requires: ['storage', 'external_logging'], currentlyShared: ['database'] },
-  { fn: 'RECOVERY_READINESS', requires: ['account', 'administrator', 'storage', 'deployment'], currentlyShared: ['everything'] },
+  {
+    fn: 'HEALTH',
+    requires: ['process', 'deployment'],
+    currentlyShared: ['process', 'database', 'deployment'],
+  },
+  {
+    fn: 'CONFIG_INTEGRITY',
+    requires: ['process', 'credential', 'storage'],
+    currentlyShared: ['database', 'credentials'],
+  },
+  {
+    fn: 'INTEGRATION_PERMISSION_DRIFT',
+    requires: ['credential', 'process'],
+    currentlyShared: ['integration credentials'],
+  },
+  {
+    fn: 'RESTRICTED_ACTION_REQUEST',
+    requires: ['process', 'credential', 'administrator'],
+    currentlyShared: ['identity provider', 'administrators'],
+  },
+  {
+    fn: 'INDEPENDENT_VERIFICATION',
+    requires: ['process', 'credential', 'storage', 'account'],
+    currentlyShared: ['everything'],
+  },
+  {
+    fn: 'EVIDENCE_FRESHNESS',
+    requires: ['storage', 'external_logging'],
+    currentlyShared: ['database'],
+  },
+  {
+    fn: 'RECOVERY_READINESS',
+    requires: ['account', 'administrator', 'storage', 'deployment'],
+    currentlyShared: ['everything'],
+  },
 ];

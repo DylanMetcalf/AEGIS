@@ -13,7 +13,11 @@ export interface PolicyRule {
   id: string;
   description: string;
   /** Declarative match over a typed input document; no executable code. */
-  when: { field: string; op: 'eq' | 'neq' | 'in' | 'gte' | 'lte'; value: string | number | string[] }[];
+  when: {
+    field: string;
+    op: 'eq' | 'neq' | 'in' | 'gte' | 'lte';
+    value: string | number | string[];
+  }[];
   effect: PolicyEffect;
 }
 

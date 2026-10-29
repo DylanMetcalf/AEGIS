@@ -6,7 +6,14 @@ import {
 } from '@aegis/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { createAsset, deleteAsset, getAsset, listAssets, toAssetDto, updateAsset } from '../../assets/assets.js';
+import {
+  createAsset,
+  deleteAsset,
+  getAsset,
+  listAssets,
+  toAssetDto,
+  updateAsset,
+} from '../../assets/assets.js';
 import { auditInTx, enforce, inTenant, type AppDeps } from '../context.js';
 import { Errors, parse } from '../errors.js';
 
@@ -65,7 +72,9 @@ export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
         targetId: id,
         metadata: {
           changed,
-          ...(changed.includes('status') ? { statusFrom: existing.status, statusTo: row.status } : {}),
+          ...(changed.includes('status')
+            ? { statusFrom: existing.status, statusTo: row.status }
+            : {}),
         },
       });
       return toAssetDto(row);
@@ -92,7 +101,11 @@ export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
         outcome: 'SUCCESS',
         targetType: 'asset',
         targetId: id,
-        metadata: { name: existing.name, environment: existing.environment, criticality: existing.criticality },
+        metadata: {
+          name: existing.name,
+          environment: existing.environment,
+          criticality: existing.criticality,
+        },
       });
     });
     return reply.status(204).send();

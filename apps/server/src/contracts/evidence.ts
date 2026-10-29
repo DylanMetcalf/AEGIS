@@ -21,7 +21,15 @@ export const EVIDENCE_KINDS = [
 ] as const;
 export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 
-export const SUBJECT_TYPES = ['asset', 'finding', 'action', 'verification', 'audit_event', 'integration', 'incident'] as const;
+export const SUBJECT_TYPES = [
+  'asset',
+  'finding',
+  'action',
+  'verification',
+  'audit_event',
+  'integration',
+  'incident',
+] as const;
 
 export const provenanceSchema = z
   .object({
@@ -43,9 +51,21 @@ export const evidenceReferenceSchema = z
     id: z.string().uuid(),
     tenantId: z.string().uuid(),
     kind: z.enum(EVIDENCE_KINDS),
-    subjects: z.array(z.object({ type: z.enum(SUBJECT_TYPES), id: z.string().min(1).max(128) }).strict()).min(1).max(20),
+    subjects: z
+      .array(z.object({ type: z.enum(SUBJECT_TYPES), id: z.string().min(1).max(128) }).strict())
+      .min(1)
+      .max(20),
     provenance: provenanceSchema,
-    verificationStatus: z.enum(['VERIFIED', 'FAILED', 'PARTIALLY_VERIFIED', 'INCONCLUSIVE', 'NOT_RUN', 'BLOCKED', 'STALE', 'NOT_APPLICABLE']),
+    verificationStatus: z.enum([
+      'VERIFIED',
+      'FAILED',
+      'PARTIALLY_VERIFIED',
+      'INCONCLUSIVE',
+      'NOT_RUN',
+      'BLOCKED',
+      'STALE',
+      'NOT_APPLICABLE',
+    ]),
     expiresAt: z.string().datetime({ offset: true }).nullable(),
   })
   .strict();
@@ -54,7 +74,8 @@ export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 
 /** Whether a piece of evidence may be cited as proof. */
 export function isConfirmedEvidence(e: EvidenceReference, now = new Date()): boolean {
-  if (e.kind !== 'OBSERVATION' && e.kind !== 'TEST_RESULT' && e.kind !== 'AUDIT_RECORD') return false;
+  if (e.kind !== 'OBSERVATION' && e.kind !== 'TEST_RESULT' && e.kind !== 'AUDIT_RECORD')
+    return false;
   if (e.provenance.collector.type === 'AI_MODEL') return false;
   if (e.verificationStatus !== ('VERIFIED' satisfies VerificationStatus)) return false;
   if (e.expiresAt && Date.parse(e.expiresAt) <= now.getTime()) return false;

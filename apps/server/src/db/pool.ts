@@ -50,7 +50,8 @@ export async function withTransaction<T>(
   ctx: DbContext,
   fn: (client: DbClient) => Promise<T>,
 ): Promise<T> {
-  if (ctx.tenantId !== null && !UUID_RE.test(ctx.tenantId)) throw new Error('Invalid tenant context');
+  if (ctx.tenantId !== null && !UUID_RE.test(ctx.tenantId))
+    throw new Error('Invalid tenant context');
   if (ctx.principalId !== null && !UUID_RE.test(ctx.principalId)) {
     throw new Error('Invalid principal context');
   }

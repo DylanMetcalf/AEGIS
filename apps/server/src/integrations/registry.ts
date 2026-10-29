@@ -1,7 +1,11 @@
 import type { HealthCheckResult } from '@aegis/shared';
 import { httpProbeProvider } from './providers/http-probe.js';
 import { testAdapterProvider } from './providers/test-adapter.js';
-import type { HealthCheckOutcome, IntegrationProvider, ProviderContext } from './providers/types.js';
+import type {
+  HealthCheckOutcome,
+  IntegrationProvider,
+  ProviderContext,
+} from './providers/types.js';
 
 export interface ProviderRegistry {
   list(): IntegrationProvider<unknown>[];
@@ -21,7 +25,10 @@ export function createProviderRegistry(opts: { testAdapterEnabled: boolean }): P
 }
 
 export class CapabilityError extends Error {
-  constructor(public readonly code: 'CAPABILITY_NOT_DECLARED' | 'CAPABILITY_NOT_IMPLEMENTED' | 'PERMISSION_NOT_GRANTED') {
+  constructor(
+    public readonly code:
+      'CAPABILITY_NOT_DECLARED' | 'CAPABILITY_NOT_IMPLEMENTED' | 'PERMISSION_NOT_GRANTED',
+  ) {
     super(code);
     this.name = 'CapabilityError';
   }
@@ -33,7 +40,9 @@ export function availableCapabilities(
   grantedPermissions: readonly string[],
 ): string[] {
   return provider.capabilities
-    .filter((c) => c.implemented && c.requiredPermissions.every((p) => grantedPermissions.includes(p)))
+    .filter(
+      (c) => c.implemented && c.requiredPermissions.every((p) => grantedPermissions.includes(p)),
+    )
     .map((c) => c.key);
 }
 

@@ -41,7 +41,9 @@ export function healthCheckJobHandler(deps: {
     async run(ctx, payload) {
       // Phase 1: mark CONNECTING. Validate everything before touching the network.
       const prepared = await ctx.tx(async (client) => {
-        const row = await getIntegration(client, ctx.tenantId, payload.integrationId, { forUpdate: true });
+        const row = await getIntegration(client, ctx.tenantId, payload.integrationId, {
+          forUpdate: true,
+        });
         if (!row) throw new JobError('INTEGRATION_NOT_FOUND', false);
         if (row.status === 'SUSPENDED' || row.status === 'REVOKED') {
           throw new JobError('INTEGRATION_NOT_ACTIVE', false);
@@ -59,10 +61,10 @@ export function healthCheckJobHandler(deps: {
           if (!integrationStateMachine.canTransition(row.status, 'CONNECTING')) {
             throw new JobError('INVALID_STATE_TRANSITION', false);
           }
-          await client.query(`UPDATE integrations SET status = 'CONNECTING' WHERE tenant_id = $1 AND id = $2`, [
-            ctx.tenantId,
-            row.id,
-          ]);
+          await client.query(
+            `UPDATE integrations SET status = 'CONNECTING' WHERE tenant_id = $1 AND id = $2`,
+            [ctx.tenantId, row.id],
+          );
         }
         return { row, provider };
       });

@@ -12,7 +12,12 @@ import { isCapability } from '../authz/capabilities.js';
 import type { AppConfig } from '../config.js';
 import { withTransaction, type Pool } from '../db/pool.js';
 import { AuditVerificationState } from '../health/health.js';
-import { evaluateSession, findSessionByToken, revokeSession, touchSession } from '../identity/sessions.js';
+import {
+  evaluateSession,
+  findSessionByToken,
+  revokeSession,
+  touchSession,
+} from '../identity/sessions.js';
 import type { ProviderRegistry } from '../integrations/registry.js';
 import { LOG_REDACT_PATHS } from '../security/redact.js';
 import { enforce, type AppDeps } from './context.js';
@@ -172,11 +177,23 @@ export async function buildApp(opts: BuildAppOptions): Promise<App> {
   }
 
   app.setNotFoundHandler((req, reply) => {
-    if (!req.url.startsWith('/api') && webDist && req.method === 'GET' && existsSync(join(webDist, 'index.html'))) {
+    // SPA fallback for client-side routes only. A missing asset (anything with
+    // a file extension) is a real 404, never index.html served as script/CSS.
+    const pathname = req.url.split('?')[0] ?? '';
+    const isNavigation = !/\.[A-Za-z0-9]+$/.test(pathname) && !pathname.startsWith('/health');
+    if (
+      !req.url.startsWith('/api') &&
+      isNavigation &&
+      webDist &&
+      req.method === 'GET' &&
+      existsSync(join(webDist, 'index.html'))
+    ) {
       return reply.type('text/html').sendFile('index.html');
     }
     const err = Errors.notFound('Route');
-    return reply.status(404).send({ error: { code: err.code, message: err.message, requestId: req.id } });
+    return reply
+      .status(404)
+      .send({ error: { code: err.code, message: err.message, requestId: req.id } });
   });
 
   return app;
@@ -196,12 +213,25 @@ async function resolveSession(app: App, req: FastifyRequest): Promise<void> {
   const validity = evaluateSession(session, config.session.idleTtlMs);
   if (validity !== 'VALID') {
     if (validity === 'IDLE_EXPIRED' || validity === 'PRINCIPAL_INACTIVE') {
-      await revokeSession(pool, session.id, validity === 'PRINCIPAL_INACTIVE' ? 'PRINCIPAL_DISABLED' : 'LOGOUT');
+      await revokeSession(
+        pool,
+        session.id,
+        validity === 'PRINCIPAL_INACTIVE' ? 'PRINCIPAL_DISABLED' : 'LOGOUT',
+      );
     }
     return;
   }
 
-  let tenant: { id: string; slug: string; display_name: string; status: 'ACTIVE' | 'SUSPENDED'; role: Actor['role']; membership_status: Actor['membershipStatus'] } | undefined;
+  let tenant:
+    | {
+        id: string;
+        slug: string;
+        display_name: string;
+        status: 'ACTIVE' | 'SUSPENDED';
+        role: Actor['role'];
+        membership_status: Actor['membershipStatus'];
+      }
+    | undefined;
   if (session.activeTenantId) {
     tenant = await withTransaction(
       pool,
@@ -219,7 +249,9 @@ async function resolveSession(app: App, req: FastifyRequest): Promise<void> {
   }
 
   req.session = session;
-  req.activeTenant = tenant ? { id: tenant.id, slug: tenant.slug, displayName: tenant.display_name } : null;
+  req.activeTenant = tenant
+    ? { id: tenant.id, slug: tenant.slug, displayName: tenant.display_name }
+    : null;
   req.actor = {
     principalId: session.principalId,
     kind: session.principal.kind,
@@ -256,6 +288,9 @@ function toSafeError(err: FastifyError | AppError | Error): AppError {
     case '23514': // check_violation
     case '22P02': // invalid_text_representation
     case '22001': // string_data_right_truncation
+    case '22003': // numeric_value_out_of_range
+    case '22007': // invalid_datetime_format
+    case '22008': // datetime_field_overflow
       return Errors.validation();
     case '42501': // insufficient_privilege, including RLS violations
       return Errors.forbidden();
@@ -267,4 +302,3 @@ function toSafeError(err: FastifyError | AppError | Error): AppError {
   }
   return Errors.internal();
 }
-

@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { SafeHttpError, checkUrlPolicy, safeHttpGet } from '../../security/safe-http.js';
-import {
-  HEALTH_CHECK_CAPABILITY,
-  ProviderConfigError,
-  type IntegrationProvider,
-} from './types.js';
+import { HEALTH_CHECK_CAPABILITY, ProviderConfigError, type IntegrationProvider } from './types.js';
 
 /**
  * HTTPS endpoint probe: a real network integration that checks whether an
@@ -30,7 +26,11 @@ export const httpProbeProvider: IntegrationProvider<HttpProbeConfig> = {
   testAdapter: false,
   supportsCredential: true,
   permissions: [
-    { key: 'http.get', description: 'Send unauthenticated or bearer-authenticated GET requests to the configured URL' },
+    {
+      key: 'http.get',
+      description:
+        'Send unauthenticated or bearer-authenticated GET requests to the configured URL',
+    },
   ],
   capabilities: [
     {
@@ -41,8 +41,20 @@ export const httpProbeProvider: IntegrationProvider<HttpProbeConfig> = {
     },
   ],
   configFields: [
-    { key: 'url', label: 'Endpoint URL', type: 'url', required: true, help: 'https:// URL of an endpoint you are authorized to probe' },
-    { key: 'expectedStatus', label: 'Expected status', type: 'number', required: false, help: 'Defaults to any 2xx' },
+    {
+      key: 'url',
+      label: 'Endpoint URL',
+      type: 'url',
+      required: true,
+      help: 'https:// URL of an endpoint you are authorized to probe',
+    },
+    {
+      key: 'expectedStatus',
+      label: 'Expected status',
+      type: 'number',
+      required: false,
+      help: 'Defaults to any 2xx',
+    },
   ],
 
   validateConfig(raw, network) {
@@ -72,7 +84,11 @@ export const httpProbeProvider: IntegrationProvider<HttpProbeConfig> = {
         : res.status >= 200 && res.status < 300;
       if (ok) return { result: 'CONNECTED', latencyMs: res.latencyMs, errorCode: null };
       if (res.status === 401 || res.status === 403) {
-        return { result: 'DISCONNECTED', latencyMs: res.latencyMs, errorCode: 'AUTHENTICATION_REJECTED' };
+        return {
+          result: 'DISCONNECTED',
+          latencyMs: res.latencyMs,
+          errorCode: 'AUTHENTICATION_REJECTED',
+        };
       }
       if (res.status >= 500) {
         return { result: 'DEGRADED', latencyMs: res.latencyMs, errorCode: 'UPSTREAM_ERROR_STATUS' };

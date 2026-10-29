@@ -30,9 +30,7 @@ export interface ProviderContext {
 }
 
 export class ProviderConfigError extends Error {
-  constructor(
-    public readonly issues: { path: string; message: string }[],
-  ) {
+  constructor(public readonly issues: { path: string; message: string }[]) {
     super('Invalid integration configuration');
     this.name = 'ProviderConfigError';
   }

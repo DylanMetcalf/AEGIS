@@ -43,7 +43,9 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
 
   app.get('/api/integrations', { config: { auth: 'integration.read' } }, async (req) => {
     const q = parse(listQuerySchema, req.query);
-    const { rows, nextCursor } = await inTenant(deps, req, (c, tenantId) => listIntegrations(c, tenantId, q));
+    const { rows, nextCursor } = await inTenant(deps, req, (c, tenantId) =>
+      listIntegrations(c, tenantId, q),
+    );
     return { items: rows.map(dto), nextCursor };
   });
 
@@ -51,7 +53,14 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
     const body = parse(createIntegrationRequestSchema, req.body);
     if (body.credentialRef) await enforce(deps, req, 'integration.credential.manage');
     const created = await inTenant(deps, req, async (c, tenantId) => {
-      const row = await createIntegration(c, tenantId, req.actor!.principalId, body, providers, network);
+      const row = await createIntegration(
+        c,
+        tenantId,
+        req.actor!.principalId,
+        body,
+        providers,
+        network,
+      );
       await auditInTx(c, req, {
         tenantId,
         action: 'integration.create',
@@ -74,7 +83,11 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
     return inTenant(deps, req, async (c, tenantId) => {
       const row = await getIntegration(c, tenantId, id);
       if (!row) throw Errors.notFound('Integration');
-      await enforce(deps, req, 'integration.read', { type: 'integration', tenantId: row.tenant_id, id });
+      await enforce(deps, req, 'integration.read', {
+        type: 'integration',
+        tenantId: row.tenant_id,
+        id,
+      });
       return { integration: dto(row), healthChecks: await listHealthChecks(c, tenantId, id) };
     });
   });
@@ -90,7 +103,14 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
       if (body.credentialRef !== undefined && body.credentialRef !== existing.credential_ref) {
         await enforce(deps, req, 'integration.credential.manage', resource);
       }
-      const { row, changed } = await updateIntegration(c, tenantId, existing, body, providers, network);
+      const { row, changed } = await updateIntegration(
+        c,
+        tenantId,
+        existing,
+        body,
+        providers,
+        network,
+      );
       await auditInTx(c, req, {
         tenantId,
         action: 'integration.update',
@@ -109,14 +129,23 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
     });
   });
 
-  const transition = (path: string, to: IntegrationStatus, capability: Capability, action: string) =>
+  const transition = (
+    path: string,
+    to: IntegrationStatus,
+    capability: Capability,
+    action: string,
+  ) =>
     app.post(path, { config: { auth: capability } }, async (req: FastifyRequest) => {
       const { id } = parse(idParams, req.params);
       const { version } = parse(integrationTransitionRequestSchema, req.body);
       return inTenant(deps, req, async (c, tenantId) => {
         const existing = await getIntegration(c, tenantId, id, { forUpdate: true });
         if (!existing) throw Errors.notFound('Integration');
-        await enforce(deps, req, capability, { type: 'integration', tenantId: existing.tenant_id, id });
+        await enforce(deps, req, capability, {
+          type: 'integration',
+          tenantId: existing.tenant_id,
+          id,
+        });
         const row = await transitionIntegration(c, tenantId, existing, to, version);
         await auditInTx(c, req, {
           tenantId,
@@ -130,8 +159,18 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
       });
     });
 
-  transition('/api/integrations/:id/suspend', 'SUSPENDED', 'integration.manage', 'integration.suspend');
-  transition('/api/integrations/:id/resume', 'CONFIGURED', 'integration.manage', 'integration.resume');
+  transition(
+    '/api/integrations/:id/suspend',
+    'SUSPENDED',
+    'integration.manage',
+    'integration.suspend',
+  );
+  transition(
+    '/api/integrations/:id/resume',
+    'CONFIGURED',
+    'integration.manage',
+    'integration.resume',
+  );
   transition('/api/integrations/:id/revoke', 'REVOKED', 'integration.revoke', 'integration.revoke');
 
   app.post(
@@ -139,7 +178,11 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
     { config: { auth: 'integration.health_check' } },
     async (req, reply) => {
       const { id } = parse(idParams, req.params);
-      if (req.body !== undefined && req.body !== null && Object.keys(req.body as object).length > 0) {
+      if (
+        req.body !== undefined &&
+        req.body !== null &&
+        Object.keys(req.body as object).length > 0
+      ) {
         throw Errors.validation([{ path: '(body)', message: 'No request body expected' }]);
       }
       const rawKey = req.headers['idempotency-key'];
@@ -149,17 +192,28 @@ export const integrationRoutes = (deps: AppDeps) => async (app: FastifyInstance)
       const result = await inTenant(deps, req, async (c, tenantId) => {
         const row = await getIntegration(c, tenantId, id);
         if (!row) throw Errors.notFound('Integration');
-        await enforce(deps, req, 'integration.health_check', { type: 'integration', tenantId: row.tenant_id, id });
+        await enforce(deps, req, 'integration.health_check', {
+          type: 'integration',
+          tenantId: row.tenant_id,
+          id,
+        });
         if (row.status === 'SUSPENDED' || row.status === 'REVOKED') {
           throw Errors.invalidTransition(row.status, 'CONNECTING');
         }
         const provider = providers.get(row.provider);
-        if (!provider) throw Errors.unprocessable('UNSUPPORTED_PROVIDER', 'This integration provider is not available');
+        if (!provider)
+          throw Errors.unprocessable(
+            'UNSUPPORTED_PROVIDER',
+            'This integration provider is not available',
+          );
         try {
           assertCapabilityUsable(provider, HEALTH_CHECK_CAPABILITY, row.granted_permissions);
         } catch (err) {
           if (err instanceof CapabilityError) {
-            throw Errors.unprocessable(err.code, 'This integration cannot perform health checks with its current permissions');
+            throw Errors.unprocessable(
+              err.code,
+              'This integration cannot perform health checks with its current permissions',
+            );
           }
           throw err;
         }

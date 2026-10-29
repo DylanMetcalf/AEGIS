@@ -58,7 +58,9 @@ export interface TestContext {
 export async function createTestApp(overrides: Record<string, string> = {}): Promise<TestContext> {
   const config = testConfig(overrides);
   const pool = createPool({ url: config.database.url, max: 10, statementTimeoutMs: 10000 });
-  const providers = createProviderRegistry({ testAdapterEnabled: config.integrations.testAdapterEnabled });
+  const providers = createProviderRegistry({
+    testAdapterEnabled: config.integrations.testAdapterEnabled,
+  });
   const logs: string[] = [];
   const logStream = new Writable({
     write(chunk, _enc, cb) {
@@ -93,13 +95,15 @@ export const uid = () => randomBytes(5).toString('hex');
 export const PASSWORD = 'correct horse battery staple';
 let passwordHash: Promise<string> | null = null;
 
-export async function createUser(opts: {
-  email?: string;
-  password?: string;
-  platformRole?: PlatformRole | null;
-  kind?: PrincipalKind;
-  status?: 'ACTIVE' | 'DISABLED';
-} = {}): Promise<{ id: string; email: string; password: string }> {
+export async function createUser(
+  opts: {
+    email?: string;
+    password?: string;
+    platformRole?: PlatformRole | null;
+    kind?: PrincipalKind;
+    status?: 'ACTIVE' | 'DISABLED';
+  } = {},
+): Promise<{ id: string; email: string; password: string }> {
   const kind = opts.kind ?? 'HUMAN';
   const email = opts.email ?? `user-${uid()}@example.test`;
   const password = opts.password ?? PASSWORD;
@@ -112,7 +116,14 @@ export async function createUser(opts: {
   const { rows } = await owner().query<{ id: string }>(
     `INSERT INTO principals (kind, email, display_name, password_hash, platform_role, status)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [kind, kind === 'HUMAN' ? email : null, `Test ${kind}`, hash, opts.platformRole ?? null, opts.status ?? 'ACTIVE'],
+    [
+      kind,
+      kind === 'HUMAN' ? email : null,
+      `Test ${kind}`,
+      hash,
+      opts.platformRole ?? null,
+      opts.status ?? 'ACTIVE',
+    ],
   );
   return { id: rows[0]!.id, email, password };
 }
@@ -146,9 +157,18 @@ type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface HttpClient {
   cookie: string | null;
-  request(method: Method, url: string, body?: unknown, headers?: Record<string, string>): Promise<LightMyRequestResponse>;
+  request(
+    method: Method,
+    url: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ): Promise<LightMyRequestResponse>;
   get(url: string): Promise<LightMyRequestResponse>;
-  post(url: string, body?: unknown, headers?: Record<string, string>): Promise<LightMyRequestResponse>;
+  post(
+    url: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ): Promise<LightMyRequestResponse>;
   put(url: string, body?: unknown): Promise<LightMyRequestResponse>;
   patch(url: string, body?: unknown): Promise<LightMyRequestResponse>;
   delete(url: string): Promise<LightMyRequestResponse>;
@@ -193,7 +213,8 @@ export async function loginAs(
   if (res.statusCode !== 200) throw new Error(`login failed: ${res.statusCode} ${res.body}`);
   if (tenantId) {
     const sel = await client.put('/api/session/tenant', { tenantId });
-    if (sel.statusCode !== 204) throw new Error(`tenant select failed: ${sel.statusCode} ${sel.body}`);
+    if (sel.statusCode !== 204)
+      throw new Error(`tenant select failed: ${sel.statusCode} ${sel.body}`);
   }
   return client;
 }
@@ -203,7 +224,11 @@ export async function memberClient(
   ctx: TestContext,
   role: TenantRole,
   tenantId?: string,
-): Promise<{ client: HttpClient; tenantId: string; user: { id: string; email: string; password: string } }> {
+): Promise<{
+  client: HttpClient;
+  tenantId: string;
+  user: { id: string; email: string; password: string };
+}> {
   const t = tenantId ?? (await createTenant());
   const user = await createUser();
   await addMember(t, user.id, role);
@@ -228,7 +253,13 @@ export function validAsset(overrides: Record<string, unknown> = {}) {
   };
 }
 
-export async function auditEvents(where: string, params: unknown[]): Promise<Record<string, unknown>[]> {
-  const { rows } = await owner().query(`SELECT * FROM audit_events WHERE ${where} ORDER BY chain_position`, params);
+export async function auditEvents(
+  where: string,
+  params: unknown[],
+): Promise<Record<string, unknown>[]> {
+  const { rows } = await owner().query(
+    `SELECT * FROM audit_events WHERE ${where} ORDER BY chain_position`,
+    params,
+  );
   return rows;
 }

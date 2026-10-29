@@ -26,7 +26,8 @@ describe('route protection policy', () => {
   it('fails startup if an API route does not declare its authorization', async () => {
     const app = Fastify();
     app.addHook('onRoute', (route) => {
-      if (route.url.startsWith('/api') && route.config?.auth === undefined) throw new Error('missing auth');
+      if (route.url.startsWith('/api') && route.config?.auth === undefined)
+        throw new Error('missing auth');
     });
     expect(() => app.get('/api/unprotected', async () => 'x')).toThrow(/missing auth/);
   });
@@ -67,7 +68,9 @@ describe('response safety', () => {
     for (const r of [res, malformed]) {
       expect(r.statusCode).toBe(400);
       const body = r.json();
-      expect(body.error).toEqual(expect.objectContaining({ code: expect.any(String), requestId: expect.any(String) }));
+      expect(body.error).toEqual(
+        expect.objectContaining({ code: expect.any(String), requestId: expect.any(String) }),
+      );
       expect(r.body).not.toMatch(/at .*\.(ts|js):\d+|node_modules|stack/);
     }
   });
@@ -85,9 +88,17 @@ describe('response safety', () => {
   });
 
   it('propagates safe correlation IDs and replaces unsafe ones', async () => {
-    const ok = await ctx.app.inject({ method: 'GET', url: '/health/live', headers: { 'x-correlation-id': 'trace-123' } });
+    const ok = await ctx.app.inject({
+      method: 'GET',
+      url: '/health/live',
+      headers: { 'x-correlation-id': 'trace-123' },
+    });
     expect(ok.headers['x-correlation-id']).toBe('trace-123');
-    const bad = await ctx.app.inject({ method: 'GET', url: '/health/live', headers: { 'x-correlation-id': 'a b<script>' } });
+    const bad = await ctx.app.inject({
+      method: 'GET',
+      url: '/health/live',
+      headers: { 'x-correlation-id': 'a b<script>' },
+    });
     expect(bad.headers['x-correlation-id']).toBe(bad.headers['x-request-id']);
   });
 });
@@ -98,7 +109,10 @@ describe('logging', () => {
     const user = await createUser();
     const client = await loginAs(ctx.app, user);
     await client.get('/api/session');
-    await httpClient(ctx.app).post('/api/auth/login', { email: user.email, password: 'wrong-password-zz9' });
+    await httpClient(ctx.app).post('/api/auth/login', {
+      email: user.email,
+      password: 'wrong-password-zz9', // secret-scan:allow test fixture
+    });
     const all = ctx.logs.join('\n');
     expect(all.length).toBeGreaterThan(0);
     expect(all).not.toContain(PASSWORD);
@@ -118,7 +132,7 @@ describe('redaction', () => {
     expect(out.password).toBe(REDACTED);
     expect(out.Authorization).toBe(REDACTED);
     expect((out.deep as Record<string, unknown>).client_secret).toBe(REDACTED);
-    expect(((out.deep as { list: Record<string, unknown>[] }).list[0]!).apiKey).toBe(REDACTED);
+    expect((out.deep as { list: Record<string, unknown>[] }).list[0]!.apiKey).toBe(REDACTED);
     expect((out.deep as Record<string, unknown>).fine).toBe(1);
     expect((out.long as string).length).toBeLessThan(600);
   });
@@ -165,6 +179,7 @@ describe('outbound request safety (SSRF)', () => {
     expect(checkUrlPolicy('https://example.com/#x', strict)).toBe('FRAGMENT_NOT_ALLOWED');
     expect(checkUrlPolicy('https://metadata.internal/', strict)).toBe('DESTINATION_NOT_ALLOWED');
     expect(checkUrlPolicy('https://[::ffff:a9fe:a9fe]/', strict)).toBe('DESTINATION_NOT_ALLOWED');
+    // eslint-disable-next-line no-script-url -- hostile input under test
     expect(checkUrlPolicy('javascript:alert(1)', strict)).toBe('SCHEME_NOT_ALLOWED');
   });
 });
@@ -175,7 +190,9 @@ describe('credential references', () => {
     expect(resolveCredentialRef('env:AEGIS_SECRET_A', env)).toBe('value-a');
     expect(resolveCredentialRef(null, env)).toBeNull();
     expect(() => resolveCredentialRef('env:DATABASE_URL', env)).toThrow(CredentialUnavailableError);
-    expect(() => resolveCredentialRef('env:AEGIS_SECRET_MISSING', env)).toThrow(CredentialUnavailableError);
+    expect(() => resolveCredentialRef('env:AEGIS_SECRET_MISSING', env)).toThrow(
+      CredentialUnavailableError,
+    );
     try {
       resolveCredentialRef('env:DATABASE_URL', env);
     } catch (err) {

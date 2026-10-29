@@ -69,16 +69,22 @@ export const memberRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
   app.post('/api/members', { config: { auth: 'membership.manage' } }, async (req, reply) => {
     const body = parse(addMemberRequestSchema, req.body);
     const member = await inTenant(deps, req, async (c, tenantId) => {
-      const { rows: principals } = await c.query<{ id: string; kind: PrincipalKind; status: string }>(
-        'SELECT id, kind, status FROM principals WHERE email = $1',
-        [body.email],
-      );
+      const { rows: principals } = await c.query<{
+        id: string;
+        kind: PrincipalKind;
+        status: string;
+      }>('SELECT id, kind, status FROM principals WHERE email = $1', [body.email]);
       const principal = principals[0];
       if (!principal || principal.status !== 'ACTIVE') {
-        throw Errors.unprocessable('PRINCIPAL_NOT_ELIGIBLE', 'No active account with that email can be added');
+        throw Errors.unprocessable(
+          'PRINCIPAL_NOT_ELIGIBLE',
+          'No active account with that email can be added',
+        );
       }
       if (!ROLE_FOR_KIND[principal.kind](body.role)) {
-        throw Errors.validation([{ path: 'role', message: `Role not permitted for ${principal.kind} identities` }]);
+        throw Errors.validation([
+          { path: 'role', message: `Role not permitted for ${principal.kind} identities` },
+        ]);
       }
       const { rows } = await c.query<{ id: string }>(
         `INSERT INTO memberships (tenant_id, principal_id, role, created_by)
@@ -98,7 +104,9 @@ export const memberRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
         targetId: rows[0].id,
         metadata: { principalId: principal.id, role: body.role },
       });
-      const { rows: out } = await c.query<MemberRow>(`${MEMBER_SELECT} WHERE m.id = $1`, [rows[0].id]);
+      const { rows: out } = await c.query<MemberRow>(`${MEMBER_SELECT} WHERE m.id = $1`, [
+        rows[0].id,
+      ]);
       return toDto(out[0]!);
     });
     return reply.status(201).send(member);
@@ -109,30 +117,33 @@ export const memberRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
     const body = parse(updateMemberRequestSchema, req.body);
     return inTenant(deps, req, async (c, tenantId) => {
       const admins = await activeAdminIds(c, tenantId);
-      const { rows } = await c.query<MemberRow>(`${MEMBER_SELECT} WHERE m.tenant_id = $1 AND m.id = $2 FOR UPDATE OF m`, [
-        tenantId,
-        id,
-      ]);
+      const { rows } = await c.query<MemberRow>(
+        `${MEMBER_SELECT} WHERE m.tenant_id = $1 AND m.id = $2 FOR UPDATE OF m`,
+        [tenantId, id],
+      );
       const existing = rows[0];
       if (!existing) throw Errors.notFound('Member');
       const nextRole = body.role ?? existing.role;
       const nextStatus = body.status ?? existing.status;
       if (!ROLE_FOR_KIND[existing.kind](nextRole)) {
-        throw Errors.validation([{ path: 'role', message: `Role not permitted for ${existing.kind} identities` }]);
+        throw Errors.validation([
+          { path: 'role', message: `Role not permitted for ${existing.kind} identities` },
+        ]);
       }
       const losesAdmin =
         existing.role === 'TENANT_ADMIN' &&
         existing.status === 'ACTIVE' &&
         (nextRole !== 'TENANT_ADMIN' || nextStatus !== 'ACTIVE');
       if (losesAdmin && admins.length <= 1) {
-        throw Errors.unprocessable('LAST_TENANT_ADMIN', 'A tenant must keep at least one active tenant administrator');
+        throw Errors.unprocessable(
+          'LAST_TENANT_ADMIN',
+          'A tenant must keep at least one active tenant administrator',
+        );
       }
-      await c.query('UPDATE memberships SET role = $3, status = $4 WHERE tenant_id = $1 AND id = $2', [
-        tenantId,
-        id,
-        nextRole,
-        nextStatus,
-      ]);
+      await c.query(
+        'UPDATE memberships SET role = $3, status = $4 WHERE tenant_id = $1 AND id = $2',
+        [tenantId, id, nextRole, nextStatus],
+      );
       await auditInTx(c, req, {
         tenantId,
         action: 'membership.update',

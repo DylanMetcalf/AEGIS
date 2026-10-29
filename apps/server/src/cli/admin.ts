@@ -4,7 +4,12 @@ import { parseArgs } from 'node:util';
 import { createTenantRequestSchema, emailSchema, newPasswordSchema, safeText } from '@aegis/shared';
 import { recordAudit } from '../audit/audit.js';
 import { ConfigError, loadConfig } from '../config.js';
-import { assertRuntimeRoleIsRestricted, createPool, withTransaction, type Pool } from '../db/pool.js';
+import {
+  assertRuntimeRoleIsRestricted,
+  createPool,
+  withTransaction,
+  type Pool,
+} from '../db/pool.js';
 import { revokeSessionsForPrincipal } from '../identity/sessions.js';
 import { hashPassword } from '../security/passwords.js';
 
@@ -27,7 +32,11 @@ async function readPassword(prompt: string): Promise<string> {
   const muted = new Writable({ write: (_c, _e, cb) => cb() });
   const interactive = process.stdin.isTTY;
   if (interactive) process.stdout.write(prompt);
-  const rl = createInterface({ input: process.stdin, output: interactive ? muted : undefined, terminal: interactive });
+  const rl = createInterface({
+    input: process.stdin,
+    output: interactive ? muted : undefined,
+    terminal: interactive,
+  });
   const line = await new Promise<string>((resolve) => rl.once('line', resolve));
   rl.close();
   if (interactive) process.stdout.write('\n');
@@ -38,7 +47,8 @@ async function readPassword(prompt: string): Promise<string> {
 
 function required(values: Record<string, string | undefined>, ...keys: string[]): void {
   const missing = keys.filter((k) => !values[k]);
-  if (missing.length) throw new Error(`Missing required option(s): ${missing.map((k) => `--${k}`).join(', ')}`);
+  if (missing.length)
+    throw new Error(`Missing required option(s): ${missing.map((k) => `--${k}`).join(', ')}`);
 }
 
 async function findPrincipal(pool: Pool, email: string) {
@@ -61,9 +71,18 @@ async function main() {
   });
   const command = positionals[0];
   const config = loadConfig();
-  const pool = createPool({ url: config.database.url, max: 2, statementTimeoutMs: 30000, applicationName: 'aegis-admin' });
+  const pool = createPool({
+    url: config.database.url,
+    max: 2,
+    statementTimeoutMs: 30000,
+    applicationName: 'aegis-admin',
+  });
   await assertRuntimeRoleIsRestricted(pool);
-  const system = { actorPrincipalId: null, actorType: 'SYSTEM' as const, metadata: { via: 'admin-cli' } };
+  const system = {
+    actorPrincipalId: null,
+    actorType: 'SYSTEM' as const,
+    metadata: { via: 'admin-cli' },
+  };
 
   try {
     switch (command) {
@@ -75,30 +94,45 @@ async function main() {
           slug: values['tenant-slug'],
           displayName: values['tenant-name'],
         });
-        const existing = await pool.query("SELECT 1 FROM principals WHERE platform_role = 'SYSTEM_OWNER'");
+        const existing = await pool.query(
+          "SELECT 1 FROM principals WHERE platform_role = 'SYSTEM_OWNER'",
+        );
         if (existing.rowCount) throw new Error('A system owner already exists; bootstrap refused');
         const password = await readPassword('Password for the system owner: ');
         const hash = await hashPassword(password);
-        await withTransaction(pool, { tenantId: null, principalId: null, platformScope: true }, async (c) => {
-          await c.query('LOCK TABLE principals IN SHARE ROW EXCLUSIVE MODE');
-          const again = await c.query("SELECT 1 FROM principals WHERE platform_role = 'SYSTEM_OWNER'");
-          if (again.rowCount) throw new Error('A system owner already exists; bootstrap refused');
-          const p = await c.query<{ id: string }>(
-            `INSERT INTO principals (kind, email, display_name, password_hash, platform_role, password_changed_at)
+        await withTransaction(
+          pool,
+          { tenantId: null, principalId: null, platformScope: true },
+          async (c) => {
+            await c.query('LOCK TABLE principals IN SHARE ROW EXCLUSIVE MODE');
+            const again = await c.query(
+              "SELECT 1 FROM principals WHERE platform_role = 'SYSTEM_OWNER'",
+            );
+            if (again.rowCount) throw new Error('A system owner already exists; bootstrap refused');
+            const p = await c.query<{ id: string }>(
+              `INSERT INTO principals (kind, email, display_name, password_hash, platform_role, password_changed_at)
              VALUES ('HUMAN', $1, $2, $3, 'SYSTEM_OWNER', now()) RETURNING id`,
-            [email, name, hash],
-          );
-          const principalId = p.rows[0]!.id;
-          const t = await c.query<{ id: string }>(
-            'INSERT INTO tenants (slug, display_name, created_by) VALUES ($1, $2, $3) RETURNING id',
-            [tenant.slug, tenant.displayName, principalId],
-          );
-          await c.query(
-            `INSERT INTO memberships (tenant_id, principal_id, role, created_by) VALUES ($1, $2, 'TENANT_ADMIN', $2)`,
-            [t.rows[0]!.id, principalId],
-          );
-          await recordAudit(c, { ...system, tenantId: null, action: 'platform.bootstrap', outcome: 'SUCCESS', targetType: 'principal', targetId: principalId });
-        });
+              [email, name, hash],
+            );
+            const principalId = p.rows[0]!.id;
+            const t = await c.query<{ id: string }>(
+              'INSERT INTO tenants (slug, display_name, created_by) VALUES ($1, $2, $3) RETURNING id',
+              [tenant.slug, tenant.displayName, principalId],
+            );
+            await c.query(
+              `INSERT INTO memberships (tenant_id, principal_id, role, created_by) VALUES ($1, $2, 'TENANT_ADMIN', $2)`,
+              [t.rows[0]!.id, principalId],
+            );
+            await recordAudit(c, {
+              ...system,
+              tenantId: null,
+              action: 'platform.bootstrap',
+              outcome: 'SUCCESS',
+              targetType: 'principal',
+              targetId: principalId,
+            });
+          },
+        );
         console.log(`Bootstrap complete: system owner ${email}, tenant ${tenant.slug}`);
         break;
       }
@@ -106,7 +140,8 @@ async function main() {
         required(values, 'email', 'name');
         const email = emailSchema.parse(values.email);
         const name = safeText(1, 200).parse(values.name);
-        if (await findPrincipal(pool, email)) throw new Error('An account with that email already exists');
+        if (await findPrincipal(pool, email))
+          throw new Error('An account with that email already exists');
         const hash = await hashPassword(await readPassword(`Initial password for ${email}: `));
         await withTransaction(pool, { tenantId: null, principalId: null }, async (c) => {
           const p = await c.query<{ id: string }>(
@@ -114,7 +149,14 @@ async function main() {
              VALUES ('HUMAN', $1, $2, $3, now()) RETURNING id`,
             [email, name, hash],
           );
-          await recordAudit(c, { ...system, tenantId: null, action: 'principal.create', outcome: 'SUCCESS', targetType: 'principal', targetId: p.rows[0]!.id });
+          await recordAudit(c, {
+            ...system,
+            tenantId: null,
+            action: 'principal.create',
+            outcome: 'SUCCESS',
+            targetType: 'principal',
+            targetId: p.rows[0]!.id,
+          });
         });
         console.log(`Created ${email}. Add them to a tenant from Settings → Members.`);
         break;
@@ -125,14 +167,24 @@ async function main() {
         const email = emailSchema.parse(values.email);
         const p = await findPrincipal(pool, email);
         if (!p || p.kind !== 'HUMAN') throw new Error('No human account with that email');
-        const hash = command === 'reset-password' ? await hashPassword(await readPassword(`New password for ${email}: `)) : null;
+        const hash =
+          command === 'reset-password'
+            ? await hashPassword(await readPassword(`New password for ${email}: `))
+            : null;
         await withTransaction(pool, { tenantId: null, principalId: null }, async (c) => {
           if (hash) {
-            await c.query('UPDATE principals SET password_hash = $2, password_changed_at = now() WHERE id = $1', [p.id, hash]);
+            await c.query(
+              'UPDATE principals SET password_hash = $2, password_changed_at = now() WHERE id = $1',
+              [p.id, hash],
+            );
           } else {
             await c.query("UPDATE principals SET status = 'DISABLED' WHERE id = $1", [p.id]);
           }
-          const n = await revokeSessionsForPrincipal(c, p.id, hash ? 'PASSWORD_CHANGED' : 'PRINCIPAL_DISABLED');
+          const n = await revokeSessionsForPrincipal(
+            c,
+            p.id,
+            hash ? 'PASSWORD_CHANGED' : 'PRINCIPAL_DISABLED',
+          );
           await recordAudit(c, {
             ...system,
             tenantId: null,
@@ -143,7 +195,9 @@ async function main() {
             metadata: { via: 'admin-cli', sessionsRevoked: n },
           });
         });
-        console.log(`${command === 'reset-password' ? 'Password reset' : 'Account disabled'} for ${email}; sessions revoked.`);
+        console.log(
+          `${command === 'reset-password' ? 'Password reset' : 'Account disabled'} for ${email}; sessions revoked.`,
+        );
         break;
       }
       default:

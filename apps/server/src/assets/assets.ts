@@ -11,7 +11,7 @@ import {
   type UpdateAssetRequest,
 } from '@aegis/shared';
 import type { DbClient } from '../db/pool.js';
-import { decodeCursor, encodeCursor } from '../http/cursor.js';
+import { decodeCursor, decodeTimestampCursor, encodeCursor } from '../http/cursor.js';
 import { Errors } from '../http/errors.js';
 
 export interface AssetRow {
@@ -50,7 +50,11 @@ export function toAssetDto(r: AssetRow): AssetDto {
   };
 }
 
-export async function getAsset(client: DbClient, tenantId: string, id: string): Promise<AssetRow | null> {
+export async function getAsset(
+  client: DbClient,
+  tenantId: string,
+  id: string,
+): Promise<AssetRow | null> {
   const { rows } = await client.query<AssetRow>(
     `SELECT ${COLUMNS} FROM assets WHERE tenant_id = $1 AND id = $2`,
     [tenantId, id],
@@ -89,10 +93,12 @@ export async function listAssets(
       where.push(`${col} = $${params.length}`);
     }
   }
-  const cursor = decodeCursor(q.cursor);
+  const cursor = q.sort === 'name' ? decodeCursor(q.cursor) : decodeTimestampCursor(q.cursor);
   if (cursor) {
     params.push(cursor.v, cursor.i);
-    where.push(`(${sortCol}, id) ${cmp} ($${params.length - 1}::${sortType}, $${params.length}::uuid)`);
+    where.push(
+      `(${sortCol}, id) ${cmp} ($${params.length - 1}::${sortType}, $${params.length}::uuid)`,
+    );
   }
   params.push(q.limit + 1);
   const { rows } = await client.query<AssetRow>(
@@ -106,7 +112,10 @@ export async function listAssets(
     items: page.map(toAssetDto),
     nextCursor:
       rows.length > q.limit && last
-        ? encodeCursor({ v: q.sort === 'name' ? last.name : last.created_at.toISOString(), i: last.id })
+        ? encodeCursor({
+            v: q.sort === 'name' ? last.name : last.created_at.toISOString(),
+            i: last.id,
+          })
         : null,
   };
 }
@@ -142,7 +151,8 @@ export async function updateAsset(
   existing: AssetRow,
   input: UpdateAssetRequest,
 ): Promise<{ row: AssetRow; changed: string[] }> {
-  if (existing.version !== input.version) throw Errors.conflict('The asset was modified by someone else');
+  if (existing.version !== input.version)
+    throw Errors.conflict('The asset was modified by someone else');
   if (existing.status === 'DECOMMISSIONED') {
     throw Errors.invalidTransition('DECOMMISSIONED', input.status ?? 'DECOMMISSIONED');
   }
@@ -185,7 +195,14 @@ export async function updateAsset(
   return { row: rows[0], changed };
 }
 
-export async function deleteAsset(client: DbClient, tenantId: string, id: string): Promise<boolean> {
-  const res = await client.query('DELETE FROM assets WHERE tenant_id = $1 AND id = $2', [tenantId, id]);
+export async function deleteAsset(
+  client: DbClient,
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  const res = await client.query('DELETE FROM assets WHERE tenant_id = $1 AND id = $2', [
+    tenantId,
+    id,
+  ]);
   return (res.rowCount ?? 0) === 1;
 }

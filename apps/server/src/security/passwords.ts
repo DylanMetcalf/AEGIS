@@ -23,7 +23,10 @@ let dummyHash: Promise<string> | null = null;
  * hash is verified instead so that response timing does not reveal whether
  * the account exists.
  */
-export async function verifyPassword(storedHash: string | null, password: string): Promise<boolean> {
+export async function verifyPassword(
+  storedHash: string | null,
+  password: string,
+): Promise<boolean> {
   if (!storedHash) {
     dummyHash ??= hashPassword('aegis-dummy-password-for-timing-equalization');
     await verify(await dummyHash, password).catch(() => false);

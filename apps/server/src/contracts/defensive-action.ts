@@ -35,7 +35,11 @@ export interface DefensiveAction {
   requiredApprovals: number;
   approvals: { principalId: string; at: string }[];
   status: ActionStatus;
-  executionRecord: { startedAt: string; finishedAt: string | null; outputRef: string | null } | null;
+  executionRecord: {
+    startedAt: string;
+    finishedAt: string | null;
+    outputRef: string | null;
+  } | null;
   verification: { status: VerificationStatus; resultRef: string | null } | null;
   auditEventIds: string[];
   failure: { code: string; at: string } | null;
@@ -59,12 +63,17 @@ export function executionPreconditionErrors(a: DefensiveAction): string[] {
   const errors: string[] = [];
   if (!actionStateMachine.canTransition(a.status, 'EXECUTING')) errors.push('NOT_AUTHORIZED');
   if (a.approvals.length < REQUIRED_APPROVALS[a.riskTier]) errors.push('INSUFFICIENT_APPROVALS');
-  if (a.approvals.some((x) => x.principalId === a.requestedBy.principalId) && a.riskTier !== 'LOW') {
+  if (
+    a.approvals.some((x) => x.principalId === a.requestedBy.principalId) &&
+    a.riskTier !== 'LOW'
+  ) {
     errors.push('SELF_APPROVAL');
   }
-  if (new Set(a.approvals.map((x) => x.principalId)).size !== a.approvals.length) errors.push('DUPLICATE_APPROVER');
+  if (new Set(a.approvals.map((x) => x.principalId)).size !== a.approvals.length)
+    errors.push('DUPLICATE_APPROVER');
   if (a.preconditions.some((p) => !p.verified)) errors.push('UNVERIFIED_PRECONDITION');
-  if ((a.riskTier === 'HIGH' || a.riskTier === 'CRITICAL') && !a.recoveryRef) errors.push('NO_RECOVERY_PLAN');
+  if ((a.riskTier === 'HIGH' || a.riskTier === 'CRITICAL') && !a.recoveryRef)
+    errors.push('NO_RECOVERY_PLAN');
   if (a.requestedBy.kind === 'AI_WORKER' && a.riskTier !== 'LOW' && a.approvals.length === 0) {
     errors.push('AI_PROPOSAL_REQUIRES_HUMAN_APPROVAL');
   }

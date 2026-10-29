@@ -66,9 +66,11 @@ export async function migrate(
         checksum   text NOT NULL CHECK (checksum ~ '^[0-9a-f]{64}$'),
         applied_at timestamptz NOT NULL DEFAULT now()
       )`);
-    const { rows: applied } = await client.query<{ version: string; checksum: string; name: string }>(
-      'SELECT version, name, checksum FROM schema_migrations ORDER BY version',
-    );
+    const { rows: applied } = await client.query<{
+      version: string;
+      checksum: string;
+      name: string;
+    }>('SELECT version, name, checksum FROM schema_migrations ORDER BY version');
     const byVersion = new Map(files.map((f) => [f.version, f]));
     for (const row of applied) {
       const file = byVersion.get(row.version);

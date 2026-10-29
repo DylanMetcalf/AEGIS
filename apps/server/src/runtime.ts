@@ -6,14 +6,18 @@ import { healthCheckJobHandler } from './jobs/health-check-job.js';
 import { Worker } from './jobs/worker.js';
 
 /** Shared startup for the API process and the standalone worker. */
-export async function createRuntime(config: AppConfig): Promise<{ pool: Pool; providers: ProviderRegistry }> {
+export async function createRuntime(
+  config: AppConfig,
+): Promise<{ pool: Pool; providers: ProviderRegistry }> {
   const pool = createPool({
     url: config.database.url,
     max: config.database.poolMax,
     statementTimeoutMs: config.database.statementTimeoutMs,
   });
   await assertRuntimeRoleIsRestricted(pool);
-  const providers = createProviderRegistry({ testAdapterEnabled: config.integrations.testAdapterEnabled });
+  const providers = createProviderRegistry({
+    testAdapterEnabled: config.integrations.testAdapterEnabled,
+  });
   return { pool, providers };
 }
 

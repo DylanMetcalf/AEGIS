@@ -146,7 +146,7 @@ export const createIntegrationRequestSchema = z
   .object({
     provider: z.string().regex(/^[a-z0-9_.-]{1,64}$/),
     name: safeText(1, 200),
-    config: z.record(z.unknown()),
+    config: z.record(z.string(), z.unknown()),
     credentialRef: credentialRefSchema.nullable().optional(),
     grantedPermissions: z
       .array(z.string().regex(/^[a-z0-9_.:-]{1,64}$/))
@@ -160,7 +160,7 @@ export const updateIntegrationRequestSchema = z
   .object({
     version: z.number().int().positive(),
     name: safeText(1, 200).optional(),
-    config: z.record(z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
     credentialRef: credentialRefSchema.nullable().optional(),
     grantedPermissions: z
       .array(z.string().regex(/^[a-z0-9_.:-]{1,64}$/))

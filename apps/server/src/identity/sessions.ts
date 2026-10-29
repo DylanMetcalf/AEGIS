@@ -109,7 +109,8 @@ export async function findSessionByToken(
   };
 }
 
-export type SessionValidity = 'VALID' | 'REVOKED' | 'EXPIRED' | 'IDLE_EXPIRED' | 'PRINCIPAL_INACTIVE';
+export type SessionValidity =
+  'VALID' | 'REVOKED' | 'EXPIRED' | 'IDLE_EXPIRED' | 'PRINCIPAL_INACTIVE';
 
 export function evaluateSession(
   s: SessionWithPrincipal,

@@ -38,21 +38,28 @@ describe('audit log', () => {
         },
       }),
     );
-    const { rows } = await owner().query("SELECT metadata FROM audit_events WHERE action = 'test.redaction'");
+    const { rows } = await owner().query(
+      "SELECT metadata FROM audit_events WHERE action = 'test.redaction'",
+    );
     const stored = JSON.stringify(rows[0].metadata);
-    for (const secret of ['pw-123', 'k-456', 'Bearer abc', 't-789']) expect(stored).not.toContain(secret);
+    for (const secret of ['pw-123', 'k-456', 'Bearer abc', 't-789'])
+      expect(stored).not.toContain(secret);
     expect(rows[0].metadata.nested.ok).toBe('visible');
     expect(rows[0].metadata.credentialRef).toBe('env:AEGIS_SECRET_OK');
   });
 
   it('cannot be modified or deleted by the application role', async () => {
-    await expect(ctx.pool.query("UPDATE audit_events SET action = 'x.y'")).rejects.toThrow(/permission denied/);
+    await expect(ctx.pool.query("UPDATE audit_events SET action = 'x.y'")).rejects.toThrow(
+      /permission denied/,
+    );
     await expect(ctx.pool.query('DELETE FROM audit_events')).rejects.toThrow(/permission denied/);
     await expect(ctx.pool.query('TRUNCATE audit_events')).rejects.toThrow(/permission denied/);
   });
 
   it('cannot be modified by the schema owner without first disabling triggers', async () => {
-    await expect(owner().query("UPDATE audit_events SET action = 'x.y'")).rejects.toThrow(/append-only/);
+    await expect(owner().query("UPDATE audit_events SET action = 'x.y'")).rejects.toThrow(
+      /append-only/,
+    );
     await expect(owner().query('DELETE FROM audit_events')).rejects.toThrow(/append-only/);
     await expect(owner().query('TRUNCATE audit_events')).rejects.toThrow(/append-only/);
   });
@@ -66,7 +73,9 @@ describe('audit log', () => {
         [tenant],
       ),
     );
-    const { rows } = await owner().query("SELECT chain_position, occurred_at FROM audit_events WHERE action = 'test.forged'");
+    const { rows } = await owner().query(
+      "SELECT chain_position, occurred_at FROM audit_events WHERE action = 'test.forged'",
+    );
     expect(Number(rows[0].chain_position)).toBeGreaterThan(1);
     expect(new Date(rows[0].occurred_at).getFullYear()).toBeGreaterThanOrEqual(2026);
     expect((await verifyAuditChain(ctx.pool)).verified).toBe(true);
@@ -77,7 +86,14 @@ describe('audit log', () => {
     await Promise.all(
       Array.from({ length: 20 }, (_, n) =>
         withTransaction(ctx.pool, { tenantId: tenant, principalId: null }, (c) =>
-          recordAudit(c, { tenantId: tenant, actorPrincipalId: null, actorType: 'SYSTEM', action: 'test.concurrent', outcome: 'SUCCESS', metadata: { n } }),
+          recordAudit(c, {
+            tenantId: tenant,
+            actorPrincipalId: null,
+            actorType: 'SYSTEM',
+            action: 'test.concurrent',
+            outcome: 'SUCCESS',
+            metadata: { n },
+          }),
         ),
       ),
     );
@@ -91,7 +107,13 @@ describe('audit log', () => {
     const b = (await memberClient(ctx, 'TENANT_ADMIN')).tenantId;
     await expect(
       withTransaction(ctx.pool, { tenantId: a, principalId: null }, (c) =>
-        recordAudit(c, { tenantId: b, actorPrincipalId: null, actorType: 'SYSTEM', action: 'test.cross', outcome: 'SUCCESS' }),
+        recordAudit(c, {
+          tenantId: b,
+          actorPrincipalId: null,
+          actorType: 'SYSTEM',
+          action: 'test.cross',
+          outcome: 'SUCCESS',
+        }),
       ),
     ).rejects.toThrow(/row-level security/);
   });
@@ -124,15 +146,23 @@ describe('audit log', () => {
     const target = rows[0]!;
     await su.query('ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_mutation');
     try {
-      await su.query(`UPDATE audit_events SET metadata = '{"rewritten": true}' WHERE chain_position = $1`, [target.chain_position]);
+      await su.query(
+        `UPDATE audit_events SET metadata = '{"rewritten": true}' WHERE chain_position = $1`,
+        [target.chain_position],
+      );
       const tampered = (await client.post('/api/platform/audit/verify')).json();
       expect(tampered.verified).toBe(false);
       expect(tampered.reason).toBe('HASH_MISMATCH');
       expect(tampered.firstInvalidPosition).toBe(target.chain_position);
-      const status = (await client.get('/api/platform/audit-events?action=audit.chain_verify&limit=1')).json().items[0];
+      const status = (
+        await client.get('/api/platform/audit-events?action=audit.chain_verify&limit=1')
+      ).json().items[0];
       expect(status.outcome).toBe('FAILURE');
     } finally {
-      await su.query('UPDATE audit_events SET metadata = $2 WHERE chain_position = $1', [target.chain_position, target.metadata]);
+      await su.query('UPDATE audit_events SET metadata = $2 WHERE chain_position = $1', [
+        target.chain_position,
+        target.metadata,
+      ]);
       await su.query('ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_mutation');
     }
     expect((await client.post('/api/platform/audit/verify')).json().verified).toBe(true);

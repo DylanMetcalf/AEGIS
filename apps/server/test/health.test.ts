@@ -40,7 +40,11 @@ describe('liveness and readiness', () => {
   });
 
   it('is not ready when the required database is unavailable', async () => {
-    const dead = createPool({ url: 'postgres://nobody:nothing@127.0.0.1:1/none', max: 1, statementTimeoutMs: 1000 });
+    const dead = createPool({
+      url: 'postgres://nobody:nothing@127.0.0.1:1/none', // secret-scan:allow intentionally unreachable database
+      max: 1,
+      statementTimeoutMs: 1000,
+    });
     const checks = await checkDatabase(dead);
     await dead.end();
     expect(isReady(checks)).toBe(false);
@@ -73,7 +77,9 @@ describe('component status', () => {
     await worker.start();
     const { client } = await memberClient(ctx, 'READ_ONLY_ANALYST');
     const state = async () =>
-      (await client.get('/api/system/status')).json().components.find((c: { key: string }) => c.key === 'worker').state;
+      (await client.get('/api/system/status'))
+        .json()
+        .components.find((c: { key: string }) => c.key === 'worker').state;
     expect(await state()).toBe('OPERATIONAL');
     await owner().query("UPDATE worker_heartbeats SET last_seen_at = now() - interval '5 minutes'");
     expect(await state()).toBe('STALE');
@@ -83,9 +89,25 @@ describe('component status', () => {
   it('marks audit verification stale or failed rather than healthy', () => {
     const s = new AuditVerificationState();
     expect(s.status().state).toBe('UNVERIFIED');
-    s.set({ verified: true, eventsChecked: 1, firstInvalidPosition: null, reason: null, headPosition: '1', headHash: 'x', verifiedAt: new Date(Date.now() - 48 * 3600_000).toISOString() });
+    s.set({
+      verified: true,
+      eventsChecked: 1,
+      firstInvalidPosition: null,
+      reason: null,
+      headPosition: '1',
+      headHash: 'x',
+      verifiedAt: new Date(Date.now() - 48 * 3600_000).toISOString(),
+    });
     expect(s.status().state).toBe('STALE');
-    s.set({ verified: false, eventsChecked: 1, firstInvalidPosition: '1', reason: 'HASH_MISMATCH', headPosition: null, headHash: null, verifiedAt: new Date().toISOString() });
+    s.set({
+      verified: false,
+      eventsChecked: 1,
+      firstInvalidPosition: '1',
+      reason: 'HASH_MISMATCH',
+      headPosition: null,
+      headHash: null,
+      verifiedAt: new Date().toISOString(),
+    });
     expect(s.status().state).toBe('FAILED');
   });
 });
@@ -114,7 +136,11 @@ describe('overview', () => {
       grantedPermissions: ['test.read'],
     });
     const o = (await client.get('/api/overview')).json();
-    expect(o.integrations).toMatchObject({ total: 1, testAdapters: 1, byEffectiveStatus: { CONFIGURED: 1 } });
+    expect(o.integrations).toMatchObject({
+      total: 1,
+      testAdapters: 1,
+      byEffectiveStatus: { CONFIGURED: 1 },
+    });
     const codes = o.setupIssues.map((i: { code: string }) => i.code);
     expect(codes).toContain('INTEGRATIONS_UNCHECKED');
     expect(codes).toContain('TEST_ADAPTERS_IN_USE');

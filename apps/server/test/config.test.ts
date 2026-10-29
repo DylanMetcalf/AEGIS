@@ -10,7 +10,7 @@ const base = {
 const prod = {
   AEGIS_ENV: 'production',
   APP_ORIGIN: 'https://aegis.example.com',
-  DATABASE_URL: 'postgres://app:super-secret-pw@db.internal:5432/aegis?sslmode=verify-full',
+  DATABASE_URL: 'postgres://app:super-secret-pw@db.internal:5432/aegis?sslmode=verify-full', // secret-scan:allow fake value for redaction test
 };
 
 function issues(env: Record<string, string>): string[] {
@@ -28,7 +28,11 @@ describe('configuration', () => {
     const c = loadConfig(base);
     expect(c.session.cookieSecure).toBe(true);
     expect(c.session.cookieName).toBe('__Host-aegis_session');
-    expect(c.integrations).toEqual({ allowPrivateNetwork: false, allowInsecureHttp: false, testAdapterEnabled: false });
+    expect(c.integrations).toEqual({
+      allowPrivateNetwork: false,
+      allowInsecureHttp: false,
+      testAdapterEnabled: false,
+    });
   });
 
   it('fails when required values are missing or invalid', () => {
@@ -46,7 +50,10 @@ describe('configuration', () => {
   });
 
   it('never includes values in error messages', () => {
-    const msgs = issues({ ...prod, DATABASE_URL: 'postgres://app:super-secret-pw@db.internal:5432/aegis' }).join('\n');
+    const msgs = issues({
+      ...prod,
+      DATABASE_URL: 'postgres://app:super-secret-pw@db.internal:5432/aegis', // secret-scan:allow fake value for redaction test
+    }).join('\n');
     expect(msgs).toMatch(/DATABASE_URL/);
     expect(msgs).not.toContain('super-secret-pw');
     const enumMsg = issues({ ...base, LOG_LEVEL: 'leaky-value-123' }).join('\n');
@@ -65,12 +72,16 @@ describe('configuration', () => {
     ['LOG_LEVEL', 'debug'],
   ])('rejects %s=%s outside development', (key, value) => {
     expect(issues({ ...prod, [key]: value })[0]).toMatch(new RegExp(`^${key}`));
-    expect(issues({ ...prod, AEGIS_ENV: 'staging', [key]: value })[0]).toMatch(new RegExp(`^${key}`));
+    expect(issues({ ...prod, AEGIS_ENV: 'staging', [key]: value })[0]).toMatch(
+      new RegExp(`^${key}`),
+    );
     expect(issues({ ...base, [key]: value })).toEqual([]);
   });
 
   it('requires https origins and TLS database connections in production', () => {
     expect(issues({ ...prod, APP_ORIGIN: 'http://aegis.example.com' })[0]).toMatch(/^APP_ORIGIN/);
-    expect(issues({ ...prod, DATABASE_URL: 'postgres://a:b@db/aegis?sslmode=disable' })[0]).toMatch(/^DATABASE_URL/);
+    expect(issues({ ...prod, DATABASE_URL: 'postgres://a:b@db/aegis?sslmode=disable' })[0]).toMatch(
+      /^DATABASE_URL/,
+    );
   });
 });

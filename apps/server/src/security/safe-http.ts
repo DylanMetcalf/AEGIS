@@ -171,7 +171,12 @@ export async function safeHttpGet(
         port: url.port || (isHttps ? 443 : 80),
         path: `${url.pathname}${url.search}`,
         method: 'GET',
-        headers: { ...opts.headers, host: hostHeader, 'user-agent': 'AEGIS-Probe/0.1', accept: '*/*' },
+        headers: {
+          ...opts.headers,
+          host: hostHeader,
+          'user-agent': 'AEGIS-Probe/0.1',
+          accept: '*/*',
+        },
         signal: opts.signal,
         ...(isHttps ? { servername, rejectUnauthorized: true } : {}),
       },
@@ -193,7 +198,8 @@ export async function safeHttpGet(
       },
     );
     req.on('error', (err: NodeJS.ErrnoException) => {
-      if (opts.signal.aborted || err.name === 'AbortError') return reject(new SafeHttpError('TIMEOUT'));
+      if (opts.signal.aborted || err.name === 'AbortError')
+        return reject(new SafeHttpError('TIMEOUT'));
       reject(new SafeHttpError(classifyNetworkError(err)));
     });
     req.end();
