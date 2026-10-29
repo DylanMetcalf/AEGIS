@@ -102,6 +102,18 @@ describe('tenant isolation through the API', () => {
 });
 
 describe('row-level security in the database', () => {
+  it('does not reveal tenants through suspended or removed memberships', async () => {
+    const t = await createTenant();
+    const user = await createUser();
+    await addMember(t, user.id, 'AUDITOR', 'REMOVED');
+    const rows = await withTransaction(
+      ctx.pool,
+      { tenantId: null, principalId: user.id },
+      async (c) => (await c.query('SELECT id FROM tenants WHERE id = $1', [t])).rows,
+    );
+    expect(rows).toHaveLength(0);
+  });
+
   async function seed() {
     const tA = await createTenant();
     const tB = await createTenant();

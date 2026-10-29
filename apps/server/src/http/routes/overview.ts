@@ -97,8 +97,10 @@ export const overviewRoutes =
             : [];
           const integrations = canReadIntegrations
             ? (
-                await c.query<Pick<IntegrationRow, 'provider' | 'status' | 'last_health_at'>>(
-                  `SELECT provider, status, last_health_at FROM integrations WHERE tenant_id = $1 AND status <> 'REVOKED'`,
+                await c.query<
+                  Pick<IntegrationRow, 'provider' | 'status' | 'last_health_at' | 'updated_at'>
+                >(
+                  `SELECT provider, status, last_health_at, updated_at FROM integrations WHERE tenant_id = $1 AND status <> 'REVOKED'`,
                   [tenantId],
                 )
               ).rows

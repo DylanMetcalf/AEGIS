@@ -401,6 +401,20 @@ describe('integration lifecycle', () => {
       effectiveStatus({ status: 'CONNECTED', last_health_at: new Date() }, 3600_000, false),
     ).toBe('UNKNOWN');
   });
+
+  it('reports a check stuck in CONNECTING as UNKNOWN, not as in progress', () => {
+    const connecting = { status: 'CONNECTING' as const, last_health_at: null };
+    expect(effectiveStatus({ ...connecting, updated_at: new Date() }, 3600_000, true)).toBe(
+      'CONNECTING',
+    );
+    expect(
+      effectiveStatus(
+        { ...connecting, updated_at: new Date(Date.now() - 10 * 60_000) },
+        3600_000,
+        true,
+      ),
+    ).toBe('UNKNOWN');
+  });
 });
 
 describe('HTTPS endpoint probe against a real server', () => {

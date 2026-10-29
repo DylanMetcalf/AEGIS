@@ -44,13 +44,23 @@ const HEALTH_STATES: readonly IntegrationStatus[] = [
   'UNKNOWN',
 ];
 
+/** A check that has been CONNECTING this long has died; its outcome is unknown. */
+export const CONNECTING_TIMEOUT_MS = 5 * 60_000;
+
 export function effectiveStatus(
-  row: Pick<IntegrationRow, 'status' | 'last_health_at'>,
+  row: Pick<IntegrationRow, 'status' | 'last_health_at'> & { updated_at?: Date },
   staleAfterMs: number,
   providerAvailable: boolean,
   now = new Date(),
 ): IntegrationStatus | 'STALE' {
   if (!providerAvailable && row.status !== 'REVOKED') return 'UNKNOWN';
+  if (
+    row.status === 'CONNECTING' &&
+    row.updated_at &&
+    now.getTime() - row.updated_at.getTime() > CONNECTING_TIMEOUT_MS
+  ) {
+    return 'UNKNOWN';
+  }
   if (HEALTH_STATES.includes(row.status)) {
     if (!row.last_health_at || now.getTime() - row.last_health_at.getTime() > staleAfterMs) {
       return 'STALE';
