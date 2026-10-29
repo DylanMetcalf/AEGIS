@@ -1,0 +1,35 @@
+{
+  "name": "aegis",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AEGIS — self-evolving cyber defense platform (Phase 1 foundation)",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/** --filter ./apps/** run build",
+    "build:shared": "pnpm --filter @aegis/shared run build",
+    "typecheck": "pnpm run build:shared && pnpm -r run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm run build:shared && pnpm -r run test",
+    "test:server": "pnpm run build:shared && pnpm --filter @aegis/server run test",
+    "test:web": "pnpm run build:shared && pnpm --filter @aegis/web run test",
+    "scan:secrets": "node scripts/secret-scan.mjs",
+    "scan:bundle": "node scripts/bundle-scan.mjs",
+    "check": "pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run scan:secrets && pnpm run test && pnpm run build && pnpm run scan:bundle"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.10",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^3.2.7"
+  }
+}
