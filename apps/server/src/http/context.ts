@@ -21,9 +21,10 @@ export interface AppDeps {
  * declaration fails application startup (see security plugin).
  *  - public: no session required (login, health)
  *  - session: any valid session; the handler performs its own checks
+ *  - ingest_token: machine routes under /ingest that authenticate a bearer ingest token
  *  - a capability: enforced before the handler runs
  */
-export type RouteAuth = 'public' | 'session' | Capability;
+export type RouteAuth = 'public' | 'session' | 'ingest_token' | Capability;
 
 declare module 'fastify' {
   interface FastifyContextConfig {

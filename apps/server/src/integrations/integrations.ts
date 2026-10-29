@@ -346,6 +346,12 @@ export async function transitionIntegration(
     [tenantId, existing.id, to, revoking, version],
   );
   if (!rows[0]) throw Errors.conflict('The integration was modified by someone else');
+  if (revoking) {
+    await client.query(
+      'UPDATE ingest_tokens SET revoked_at = now() WHERE tenant_id = $1 AND integration_id = $2 AND revoked_at IS NULL',
+      [tenantId, existing.id],
+    );
+  }
   return rows[0];
 }
 

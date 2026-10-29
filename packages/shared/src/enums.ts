@@ -160,3 +160,51 @@ export const IMPLEMENTATION_STATUSES = [
   'DEPRECATED',
 ] as const;
 export type ImplementationStatus = (typeof IMPLEMENTATION_STATUSES)[number];
+
+export const SEVERITIES = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+export type Severity = (typeof SEVERITIES)[number];
+
+export const TELEMETRY_EVENT_TYPES = [
+  'auth.success',
+  'auth.failure',
+  'http.request',
+  'iam.role_granted',
+  'iam.role_revoked',
+  'config.changed',
+  'security.alert',
+] as const;
+export type TelemetryEventType = (typeof TELEMETRY_EVENT_TYPES)[number];
+
+export const FINDING_STATUSES = [
+  'OPEN',
+  'TRIAGED',
+  'IN_PROGRESS',
+  'RESOLVED',
+  'FALSE_POSITIVE',
+  'ACCEPTED_RISK',
+] as const;
+export type FindingStatus = (typeof FINDING_STATUSES)[number];
+export const CLOSED_FINDING_STATUSES: readonly FindingStatus[] = [
+  'RESOLVED',
+  'FALSE_POSITIVE',
+  'ACCEPTED_RISK',
+];
+
+export const EVIDENCE_KINDS = [
+  'OBSERVATION',
+  'TEST_RESULT',
+  'AUDIT_RECORD',
+  'OPERATOR_NOTE',
+  'RECOMMENDATION',
+  'MODEL_ASSERTION',
+] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+export const RELATIONSHIP_KINDS = [
+  'DEPENDS_ON',
+  'CONNECTS_TO',
+  'CONTAINS',
+  'AUTHENTICATES_WITH',
+  'STORES_DATA_IN',
+] as const;
+export type RelationshipKind = (typeof RELATIONSHIP_KINDS)[number];

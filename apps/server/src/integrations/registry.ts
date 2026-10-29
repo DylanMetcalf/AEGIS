@@ -1,4 +1,5 @@
 import type { HealthCheckResult } from '@aegis/shared';
+import { eventIngestProvider } from './providers/event-ingest.js';
 import { httpProbeProvider } from './providers/http-probe.js';
 import { testAdapterProvider } from './providers/test-adapter.js';
 import type {
@@ -15,6 +16,7 @@ export interface ProviderRegistry {
 export function createProviderRegistry(opts: { testAdapterEnabled: boolean }): ProviderRegistry {
   const providers = [
     httpProbeProvider,
+    eventIngestProvider,
     ...(opts.testAdapterEnabled ? [testAdapterProvider] : []),
   ] as IntegrationProvider<unknown>[];
   const byId = new Map(providers.map((p) => [p.id, p]));

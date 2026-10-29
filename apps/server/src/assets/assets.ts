@@ -22,7 +22,6 @@ export interface AssetRow {
   environment: Environment;
   criticality: Criticality;
   status: AssetStatus;
-  coverage_state: CoverageState;
   description: string | null;
   authorization_scope: AuthorizationScope;
   version: number;
@@ -30,10 +29,11 @@ export interface AssetRow {
   updated_at: Date;
 }
 
-const COLUMNS = `id, tenant_id, name, asset_type, environment, criticality, status, coverage_state,
+const COLUMNS = `id, tenant_id, name, asset_type, environment, criticality, status,
   description, authorization_scope, version, created_at, updated_at`;
 
-export function toAssetDto(r: AssetRow): AssetDto {
+/** Coverage is computed from live signals (coverage/coverage.ts); callers supply it. */
+export function toAssetDto(r: AssetRow, coverageState: CoverageState = 'UNKNOWN'): AssetDto {
   return {
     id: r.id,
     name: r.name,
@@ -41,7 +41,7 @@ export function toAssetDto(r: AssetRow): AssetDto {
     environment: r.environment,
     criticality: r.criticality,
     status: r.status,
-    coverageState: r.coverage_state,
+    coverageState,
     description: r.description,
     authorizationScope: r.authorization_scope,
     version: r.version,
@@ -109,7 +109,7 @@ export async function listAssets(
   const page = rows.slice(0, q.limit);
   const last = page.at(-1);
   return {
-    items: page.map(toAssetDto),
+    items: page.map((r) => toAssetDto(r)),
     nextCursor:
       rows.length > q.limit && last
         ? encodeCursor({

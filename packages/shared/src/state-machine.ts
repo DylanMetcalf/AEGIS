@@ -1,4 +1,4 @@
-import type { ActionStatus, AssetStatus, IntegrationStatus } from './enums.js';
+import type { ActionStatus, AssetStatus, FindingStatus, IntegrationStatus } from './enums.js';
 
 /**
  * A finite state machine described by an explicit transition table.
@@ -76,4 +76,17 @@ export const actionStateMachine = defineStateMachine<ActionStatus>('defensive_ac
   FAILED: [],
   INCONCLUSIVE: ['VERIFYING'],
   CANCELLED: [],
+});
+
+/**
+ * Finding lifecycle. Closing states require a resolution note (DB constraint);
+ * any closed finding can be reopened. Recurrence after closure opens a new finding.
+ */
+export const findingStateMachine = defineStateMachine<FindingStatus>('finding', {
+  OPEN: ['TRIAGED', 'IN_PROGRESS', 'RESOLVED', 'FALSE_POSITIVE', 'ACCEPTED_RISK'],
+  TRIAGED: ['IN_PROGRESS', 'RESOLVED', 'FALSE_POSITIVE', 'ACCEPTED_RISK'],
+  IN_PROGRESS: ['TRIAGED', 'RESOLVED', 'FALSE_POSITIVE', 'ACCEPTED_RISK'],
+  RESOLVED: ['OPEN'],
+  FALSE_POSITIVE: ['OPEN'],
+  ACCEPTED_RISK: ['OPEN'],
 });

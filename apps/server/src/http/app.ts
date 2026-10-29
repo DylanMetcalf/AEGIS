@@ -25,7 +25,10 @@ import { AppError, Errors } from './errors.js';
 import { assetRoutes } from './routes/assets.js';
 import { auditRoutes } from './routes/audit.js';
 import { authRoutes } from './routes/auth.js';
+import { graphRoutes } from './routes/graph.js';
 import { healthRoutes } from './routes/health.js';
+import { ingestRoutes } from './routes/ingest.js';
+import { intelRoutes } from './routes/intel.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { memberRoutes } from './routes/members.js';
 import { overviewRoutes } from './routes/overview.js';
@@ -80,12 +83,17 @@ export async function buildApp(opts: BuildAppOptions): Promise<App> {
 
   // Every /api route must declare its protection, or startup fails.
   app.addHook('onRoute', (route) => {
-    if (!route.url.startsWith('/api')) return;
+    if (!route.url.startsWith('/api') && !route.url.startsWith('/ingest')) return;
     const auth = route.config?.auth;
     if (auth === undefined) {
       throw new Error(`Route ${route.method} ${route.url} does not declare config.auth`);
     }
-    if (auth !== 'public' && auth !== 'session' && !isCapability(auth)) {
+    if (route.url.startsWith('/ingest') !== (auth === 'ingest_token')) {
+      throw new Error(
+        `Route ${route.method} ${route.url}: ingest_token auth is required for, and only for, /ingest routes`,
+      );
+    }
+    if (auth !== 'public' && auth !== 'session' && auth !== 'ingest_token' && !isCapability(auth)) {
       throw new Error(`Route ${route.method} ${route.url} declares unknown capability ${auth}`);
     }
   });
@@ -142,7 +150,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<App> {
     if (!req.url.startsWith('/api')) return;
     await resolveSession(app, req);
     const auth = req.routeOptions.config.auth;
-    if (auth === 'public' || auth === undefined) return;
+    if (auth === 'public' || auth === 'ingest_token' || auth === undefined) return;
     if (!req.actor) throw Errors.unauthenticated();
     if (auth !== 'session') await enforce(deps, req, auth);
   });
@@ -170,6 +178,9 @@ export async function buildApp(opts: BuildAppOptions): Promise<App> {
   await app.register(auditRoutes(deps));
   await app.register(platformRoutes(deps, app.auditVerification));
   await app.register(overviewRoutes(deps, app.auditVerification));
+  await app.register(ingestRoutes(deps));
+  await app.register(intelRoutes(deps));
+  await app.register(graphRoutes(deps));
 
   const webDist = config.webDistDir;
   if (webDist && existsSync(join(webDist, 'index.html'))) {

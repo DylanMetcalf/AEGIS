@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { AppConfig } from './config.js';
 import { assertRuntimeRoleIsRestricted, createPool, type Pool } from './db/pool.js';
 import { createProviderRegistry, type ProviderRegistry } from './integrations/registry.js';
+import { detectionJobHandler } from './jobs/detection-job.js';
 import { healthCheckJobHandler } from './jobs/health-check-job.js';
 import { Worker } from './jobs/worker.js';
 
@@ -27,5 +28,8 @@ export function createWorker(
   providers: ProviderRegistry,
   log: FastifyBaseLogger,
 ): Worker {
-  return new Worker({ pool, config, log }, [healthCheckJobHandler({ config, providers })]);
+  return new Worker({ pool, config, log }, [
+    healthCheckJobHandler({ config, providers }),
+    detectionJobHandler({ providers }),
+  ]);
 }

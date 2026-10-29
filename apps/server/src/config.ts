@@ -49,6 +49,8 @@ const envSchema = z
     LOGIN_LOCKOUT_MINUTES: int(15, 1, 1440),
     RATE_LIMIT_PER_MINUTE: int(300, 10, 100000),
     LOGIN_RATE_LIMIT_PER_MINUTE: int(20, 1, 100000),
+    INGEST_RATE_LIMIT_PER_MINUTE: int(120, 1, 100000),
+    INGEST_BODY_LIMIT_BYTES: int(1048576, 1024, 10485760),
     BODY_LIMIT_BYTES: int(65536, 1024, 1048576),
 
     LOG_LEVEL: z
@@ -139,6 +141,10 @@ function toConfig(env: z.infer<typeof envSchema>) {
       rateLimitPerMinute: env.RATE_LIMIT_PER_MINUTE,
       loginRateLimitPerMinute: env.LOGIN_RATE_LIMIT_PER_MINUTE,
       bodyLimitBytes: env.BODY_LIMIT_BYTES,
+    },
+    ingest: {
+      rateLimitPerMinute: env.INGEST_RATE_LIMIT_PER_MINUTE,
+      bodyLimitBytes: env.INGEST_BODY_LIMIT_BYTES,
     },
     logLevel: env.LOG_LEVEL,
     worker: {

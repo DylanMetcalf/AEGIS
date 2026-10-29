@@ -2,6 +2,7 @@ import { hostname } from 'node:os';
 import type { z } from 'zod';
 import type { FastifyBaseLogger } from 'fastify';
 import { authorize, type Actor } from '../authz/authorize.js';
+import { loadActorForTenant } from '../authz/load-actor.js';
 import type { Capability } from '../authz/capabilities.js';
 import { recordAudit } from '../audit/audit.js';
 import type { AppConfig } from '../config.js';
@@ -168,43 +169,8 @@ export class Worker {
     return rows[0] ?? null;
   }
 
-  private async loadActor(job: JobRow): Promise<Actor | null> {
-    return withTransaction(
-      this.deps.pool,
-      { tenantId: job.tenant_id, principalId: job.actor_principal_id },
-      async (client) => {
-        const { rows } = await client.query<{
-          kind: Actor['kind'];
-          status: Actor['status'];
-          platform_role: Actor['platformRole'];
-          tenant_status: 'ACTIVE' | 'SUSPENDED';
-          role: Actor['role'];
-          membership_status: Actor['membershipStatus'];
-        }>(
-          `SELECT p.kind, p.status, p.platform_role, t.status AS tenant_status,
-                  m.role, m.status AS membership_status
-             FROM principals p
-             JOIN tenants t ON t.id = $1
-             LEFT JOIN memberships m ON m.tenant_id = t.id AND m.principal_id = p.id
-            WHERE p.id = $2`,
-          [job.tenant_id, job.actor_principal_id],
-        );
-        const r = rows[0];
-        if (!r) return null;
-        return {
-          principalId: job.actor_principal_id,
-          kind: r.kind,
-          status: r.status,
-          platformRole: r.platform_role,
-          tenantId: job.tenant_id,
-          tenantStatus: r.tenant_status,
-          role: r.role,
-          membershipStatus: r.membership_status,
-          sessionId: null,
-          reauthenticatedAt: null,
-        };
-      },
-    );
+  private loadActor(job: JobRow): Promise<Actor | null> {
+    return loadActorForTenant(this.deps.pool, job.tenant_id, job.actor_principal_id);
   }
 
   private async execute(job: JobRow): Promise<void> {

@@ -6,9 +6,11 @@ import type {
   IntegrationStatus,
   OverviewDto,
   SetupIssueDto,
+  Severity,
 } from '@aegis/shared';
 import type { FastifyInstance } from 'fastify';
 import { authorize } from '../../authz/authorize.js';
+import { loadCoverage } from '../../coverage/coverage.js';
 import { listAuditEvents } from '../../audit/audit.js';
 import type { AuditVerificationState } from '../../health/health.js';
 import { checkDatabase, sentinelStatus, workerStatus } from '../../health/health.js';
@@ -65,6 +67,12 @@ export const overviewRoutes =
         const canReadAssets = authorize(actor, 'asset.read', {
           reauthWindowMs: config.session.reauthWindowMs,
         }).allowed;
+        const canReadTelemetry = authorize(actor, 'telemetry.read', {
+          reauthWindowMs: config.session.reauthWindowMs,
+        }).allowed;
+        const canReadFindings = authorize(actor, 'finding.read', {
+          reauthWindowMs: config.session.reauthWindowMs,
+        }).allowed;
         const canReadIntegrations = authorize(actor, 'integration.read', {
           reauthWindowMs: config.session.reauthWindowMs,
         }).allowed;
@@ -81,16 +89,15 @@ export const overviewRoutes =
                 await c.query<{
                   environment: Environment;
                   criticality: Criticality;
-                  coverage_state: CoverageState;
                   n: string;
                   expired: string;
                 }>(
-                  `SELECT environment, criticality, coverage_state, count(*) AS n,
+                  `SELECT environment, criticality, count(*) AS n,
                       count(*) FILTER (WHERE authorization_scope ? 'expiresAt'
                                          AND authorization_scope->>'expiresAt' IS NOT NULL
                                          AND (authorization_scope->>'expiresAt')::timestamptz < now()) AS expired
                  FROM assets WHERE tenant_id = $1 AND status <> 'DECOMMISSIONED'
-                GROUP BY environment, criticality, coverage_state`,
+                GROUP BY environment, criticality`,
                   [tenantId],
                 )
               ).rows
@@ -108,7 +115,37 @@ export const overviewRoutes =
           const recentAudit = canReadAudit
             ? (await listAuditEvents(c, { scope: { tenantId }, limit: 8 })).items
             : null;
-          return { tenant, assetCounts, integrations, recentAudit };
+          const coverage = canReadAssets
+            ? await loadCoverage(c, tenantId, providers, config.health.staleAfterMs)
+            : new Map<string, { state: CoverageState }>();
+          const telemetryStats = canReadTelemetry
+            ? (
+                await c.query<{ n: number; last: Date | null }>(
+                  `SELECT (SELECT count(*)::int FROM telemetry_events
+                            WHERE tenant_id = $1 AND received_at > now() - interval '24 hours') AS n,
+                          (SELECT max(last_event_at) FROM integrations WHERE tenant_id = $1) AS last`,
+                  [tenantId],
+                )
+              ).rows[0]!
+            : null;
+          const openFindings = canReadFindings
+            ? (
+                await c.query<{ severity: Severity; n: number }>(
+                  `SELECT severity, count(*)::int AS n FROM findings
+                    WHERE tenant_id = $1 AND status IN ('OPEN', 'TRIAGED', 'IN_PROGRESS') GROUP BY severity`,
+                  [tenantId],
+                )
+              ).rows
+            : null;
+          return {
+            tenant,
+            assetCounts,
+            integrations,
+            recentAudit,
+            coverage,
+            telemetryStats,
+            openFindings,
+          };
         });
 
         const byEnvironment: OverviewDto['assets']['byEnvironment'] = {};
@@ -122,8 +159,16 @@ export const overviewRoutes =
           expiredScopes += Number(r.expired);
           byEnvironment[r.environment] = (byEnvironment[r.environment] ?? 0) + n;
           byCriticality[r.criticality] = (byCriticality[r.criticality] ?? 0) + n;
-          byCoverage[r.coverage_state] = (byCoverage[r.coverage_state] ?? 0) + n;
         }
+
+        for (const v of data.coverage.values())
+          byCoverage[v.state] = (byCoverage[v.state] ?? 0) + 1;
+        const openBySeverity: Partial<Record<Severity, number>> = {};
+        for (const r of data.openFindings ?? []) openBySeverity[r.severity] = r.n;
+        const openTotal = (data.openFindings ?? []).reduce((a, r) => a + r.n, 0);
+        const lastEventAt = data.telemetryStats?.last ?? null;
+        const telemetryFresh =
+          lastEventAt !== null && Date.now() - lastEventAt.getTime() <= config.health.staleAfterMs;
 
         const byEffectiveStatus: Partial<Record<IntegrationStatus | 'STALE', number>> = {};
         let testAdapters = 0;
@@ -200,16 +245,41 @@ export const overviewRoutes =
           tenant: { id: data.tenant.id, displayName: data.tenant.display_name },
           assets: { total: totalAssets, byEnvironment, byCriticality, byCoverage },
           integrations: { total: data.integrations.length, byEffectiveStatus, testAdapters },
-          telemetry: {
-            state: 'NOT_IMPLEMENTED',
-            detail:
-              'No security telemetry is collected yet (Phase 2). Absence of data is not evidence of safety.',
-          },
-          findings: {
-            state: 'NOT_IMPLEMENTED',
-            detail:
-              'No detection engine is running (Phase 2). Zero findings does not mean zero threats.',
-          },
+          telemetry: !data.telemetryStats
+            ? {
+                state: 'UNKNOWN',
+                detail: 'Your role cannot view telemetry.',
+                eventsLast24h: 0,
+                lastEventAt: null,
+              }
+            : {
+                state:
+                  lastEventAt === null ? 'UNCONFIGURED' : telemetryFresh ? 'OPERATIONAL' : 'STALE',
+                detail:
+                  lastEventAt === null
+                    ? 'No telemetry has been received. Configure an Event Intake integration. Absence of data is not evidence of safety.'
+                    : telemetryFresh
+                      ? 'Telemetry is arriving. Detection covers only the event types and rules AEGIS implements.'
+                      : 'No recent telemetry. Detection cannot see current activity.',
+                eventsLast24h: data.telemetryStats.n,
+                lastEventAt: lastEventAt?.toISOString() ?? null,
+              },
+          findings: !data.openFindings
+            ? {
+                state: 'UNKNOWN',
+                detail: 'Your role cannot view findings.',
+                open: 0,
+                openBySeverity: {},
+              }
+            : {
+                state: lastEventAt === null ? 'UNCONFIGURED' : 'OPERATIONAL',
+                detail:
+                  openTotal === 0
+                    ? 'No open findings from the implemented rules. This is not proof that no threats exist.'
+                    : `${openTotal} open finding(s) require attention.`,
+                open: openTotal,
+                openBySeverity,
+              },
           components: comps,
           setupIssues: issues,
           recentAudit: data.recentAudit,

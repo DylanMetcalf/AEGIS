@@ -113,13 +113,15 @@ describe('component status', () => {
 });
 
 describe('overview', () => {
-  it('reports absent telemetry and findings as not implemented, never as safe', async () => {
+  it('reports absent telemetry as unconfigured and never as safe', async () => {
     const { client } = await memberClient(ctx, 'TENANT_ADMIN');
     const res = await client.get('/api/overview');
     expect(res.statusCode).toBe(200);
     const o = res.json();
-    expect(o.telemetry.state).toBe('NOT_IMPLEMENTED');
-    expect(o.findings.state).toBe('NOT_IMPLEMENTED');
+    expect(o.telemetry.state).toBe('UNCONFIGURED');
+    expect(o.telemetry.detail).toMatch(/not evidence of safety/);
+    expect(o.findings.state).toBe('UNCONFIGURED');
+    expect(o.findings.open).toBe(0);
     expect(o.assets.total).toBe(0);
     expect(o.setupIssues.map((i: { code: string }) => i.code)).toEqual(
       expect.arrayContaining(['NO_ASSETS', 'NO_INTEGRATIONS']),

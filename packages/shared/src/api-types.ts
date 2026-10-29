@@ -1,4 +1,12 @@
 import type {
+  EvidenceKind,
+  FindingStatus,
+  RelationshipKind,
+  Severity,
+  TelemetryEventType,
+  VerificationStatus,
+} from './enums.js';
+import type {
   AssetStatus,
   AssetType,
   AuditActorType,
@@ -206,9 +214,118 @@ export interface OverviewDto {
     byEffectiveStatus: Partial<Record<IntegrationStatus | 'STALE', number>>;
     testAdapters: number;
   };
-  telemetry: { state: ComponentState; detail: string };
-  findings: { state: ComponentState; detail: string };
+  telemetry: {
+    state: ComponentState;
+    detail: string;
+    eventsLast24h: number;
+    lastEventAt: string | null;
+  };
+  findings: {
+    state: ComponentState;
+    detail: string;
+    open: number;
+    openBySeverity: Partial<Record<Severity, number>>;
+  };
   components: ComponentStatusDto[];
   setupIssues: SetupIssueDto[];
   recentAudit: AuditEventDto[] | null;
+}
+
+export interface IngestTokenDto {
+  id: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface TelemetryEventDto {
+  id: string;
+  eventType: TelemetryEventType;
+  severity: Severity;
+  observedAt: string;
+  receivedAt: string;
+  actorUserId: string | null;
+  actorIp: string | null;
+  attributes: Record<string, string | number | boolean>;
+  integrationId: string;
+  assetId: string | null;
+}
+
+export interface FindingDto {
+  id: string;
+  ruleId: string;
+  ruleVersion: number;
+  title: string;
+  severity: Severity;
+  status: FindingStatus;
+  groupKey: string;
+  assetId: string | null;
+  integrationId: string | null;
+  occurrenceCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  summary: Record<string, unknown>;
+  resolutionNote: string | null;
+  assigneePrincipalId: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvidenceDto {
+  id: string;
+  kind: EvidenceKind;
+  /** True only for kinds that can ever count as proof. */
+  probative: boolean;
+  findingId: string | null;
+  investigationId: string | null;
+  telemetryEventId: string | null;
+  provenance: {
+    collectorType: 'INTEGRATION' | 'PLATFORM' | 'HUMAN' | 'AI_MODEL';
+    collectorId: string;
+    collectorVersion: string;
+    collectedAt: string;
+    sourceRef: string;
+    contentSha256: string;
+  };
+  body: Record<string, unknown> | null;
+  verificationStatus: VerificationStatus;
+  verifiedAt: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface InvestigationDto {
+  id: string;
+  title: string;
+  status: 'OPEN' | 'CLOSED';
+  summary: string | null;
+  findingIds: string[];
+  closedAt: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoverageDto {
+  assetId: string;
+  assetName: string;
+  state: CoverageState;
+  reasons: string[];
+  evaluatedAt: string;
+}
+
+export interface RelationshipDto {
+  id: string;
+  fromAssetId: string;
+  toAssetId: string;
+  kind: RelationshipKind;
+  createdAt: string;
+}
+
+export interface GraphDto {
+  nodes: { id: string; type: 'asset' | 'finding' | 'integration'; label: string; state: string }[];
+  edges: { from: string; to: string; kind: string }[];
+  truncated: boolean;
 }

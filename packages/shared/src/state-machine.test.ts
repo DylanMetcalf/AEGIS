@@ -54,9 +54,9 @@ describe('product modules', () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  it('only marks Phase 1 modules operational', () => {
+  it('only marks Phase 1-2 modules operational', () => {
     for (const m of PRODUCT_MODULES) {
-      if (m.state === 'OPERATIONAL') expect(m.phase).toBe(1);
+      if (m.state === 'OPERATIONAL') expect(m.phase).toBeLessThanOrEqual(2);
     }
     expect(PRODUCT_MODULES.find((m) => m.key === 'sentinel')?.state).toBe('FOUNDATION_ONLY');
   });

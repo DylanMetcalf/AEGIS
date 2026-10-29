@@ -14,15 +14,34 @@ import {
   toAssetDto,
   updateAsset,
 } from '../../assets/assets.js';
+import type { AssetDto } from '@aegis/shared';
+import { loadCoverage } from '../../coverage/coverage.js';
+import type { DbClient } from '../../db/pool.js';
 import { auditInTx, enforce, inTenant, type AppDeps } from '../context.js';
 import { Errors, parse } from '../errors.js';
 
 const idParams = z.object({ id: uuidSchema }).strict();
 
 export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
+  /** Attach computed coverage to asset DTOs. */
+  const withCoverage = async (c: DbClient, tenantId: string, items: AssetDto[]) => {
+    if (items.length === 0) return items;
+    const cov = await loadCoverage(
+      c,
+      tenantId,
+      deps.providers,
+      deps.config.health.staleAfterMs,
+      items.map((a) => a.id),
+    );
+    return items.map((a) => ({ ...a, coverageState: cov.get(a.id)?.state ?? 'UNKNOWN' }));
+  };
+
   app.get('/api/assets', { config: { auth: 'asset.read' } }, async (req) => {
     const q = parse(assetListQuerySchema, req.query);
-    return inTenant(deps, req, (c, tenantId) => listAssets(c, tenantId, q));
+    return inTenant(deps, req, async (c, tenantId) => {
+      const page = await listAssets(c, tenantId, q);
+      return { ...page, items: await withCoverage(c, tenantId, page.items) };
+    });
   });
 
   app.post('/api/assets', { config: { auth: 'asset.create' } }, async (req, reply) => {
@@ -37,7 +56,7 @@ export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
         targetId: row.id,
         metadata: { name: row.name, environment: row.environment, criticality: row.criticality },
       });
-      return toAssetDto(row);
+      return (await withCoverage(c, tenantId, [toAssetDto(row)]))[0]!;
     });
     return reply.status(201).send(asset);
   });
@@ -47,7 +66,11 @@ export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
     const row = await inTenant(deps, req, (c, tenantId) => getAsset(c, tenantId, id));
     if (!row) throw Errors.notFound('Asset');
     await enforce(deps, req, 'asset.read', { type: 'asset', tenantId: row.tenant_id, id: row.id });
-    return toAssetDto(row);
+    return inTenant(
+      deps,
+      req,
+      async (c, tenantId) => (await withCoverage(c, tenantId, [toAssetDto(row)]))[0]!,
+    );
   });
 
   app.patch('/api/assets/:id', { config: { auth: 'asset.update' } }, async (req) => {
@@ -77,7 +100,7 @@ export const assetRoutes = (deps: AppDeps) => async (app: FastifyInstance) => {
             : {}),
         },
       });
-      return toAssetDto(row);
+      return (await withCoverage(c, tenantId, [toAssetDto(row)]))[0]!;
     });
   });
 

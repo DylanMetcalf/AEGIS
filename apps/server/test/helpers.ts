@@ -8,6 +8,7 @@ import { loadConfig, type AppConfig } from '../src/config.js';
 import { createPool, type Pool } from '../src/db/pool.js';
 import { buildApp, type App } from '../src/http/app.js';
 import { createProviderRegistry } from '../src/integrations/registry.js';
+import { detectionJobHandler } from '../src/jobs/detection-job.js';
 import { healthCheckJobHandler } from '../src/jobs/health-check-job.js';
 import { Worker } from '../src/jobs/worker.js';
 import { hashPassword } from '../src/security/passwords.js';
@@ -86,6 +87,7 @@ export function createTestWorker(ctx: TestContext, env?: NodeJS.ProcessEnv): Wor
   const providers = createProviderRegistry({ testAdapterEnabled: true });
   return new Worker({ pool: ctx.pool, config: ctx.config, log: ctx.app.log }, [
     healthCheckJobHandler({ config: ctx.config, providers, env }),
+    detectionJobHandler({ providers }),
   ]);
 }
 
